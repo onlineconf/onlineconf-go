@@ -3,7 +3,7 @@ package onlineconf
 import (
 	"bufio"
 	"fmt"
-	"github.com/howeyc/fsnotify"
+	"github.com/fsnotify/fsnotify"
 	"log"
 	"os"
 	"path"
@@ -28,13 +28,12 @@ func init() {
 	go func() {
 		watcher, err := fsnotify.NewWatcher()
 
-		defer watcher.Close()
-
 		if err != nil {
 			panic(err)
 		}
+		defer watcher.Close()
 
-		err = watcher.Watch(config_file)
+		err = watcher.Add(config_file)
 
 		if err != nil {
 			panic(err)
@@ -42,23 +41,23 @@ func init() {
 
 		for {
 			select {
-			case ev := <-watcher.Event:
-				err := watcher.RemoveWatch(config_file)
+			case ev := <-watcher.Events:
+				//log.Println("fsnotify event:", ev)
 
-				if err != nil {
-					panic(err)
-				}
+				if ev.Op&fsnotify.Remove == fsnotify.Remove {
 
-				if ev.IsCreate() || ev.IsModify() {
+					err = watcher.Add(config_file)
+					if err != nil {
+						panic(err)
+					}
 					read()
 				}
 
-				err = watcher.Watch(config_file)
-
-				if err != nil {
-					panic(err)
+				if (ev.Op&fsnotify.Create == fsnotify.Create) || (ev.Op&fsnotify.Write == fsnotify.Write) {
+					read()
 				}
-			case err := <-watcher.Error:
+
+			case err := <-watcher.Errors:
 				log.Printf("Watch %v error: %v\n", config_file, err)
 			}
 		}
