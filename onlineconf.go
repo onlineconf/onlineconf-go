@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
+	"io"
 	"log"
 	"os"
 	"path"
@@ -141,4 +142,8 @@ func IfExistAsString(k string) (string, bool) {
 	}
 
 	return "", false
+}
+
+func SetOutput(w io.Writer) {
+	log.SetOutput(w)
 }
