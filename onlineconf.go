@@ -1,149 +1,206 @@
 package onlineconf
 
 import (
-	"bufio"
 	"fmt"
 	"github.com/fsnotify/fsnotify"
+	"github.com/jbarham/go-cdb"
 	"io"
 	"log"
-	"os"
-	"path"
 	"strconv"
-	"strings"
+	"sync"
 )
 
-type row struct {
-	i int
-	c bool
-	s string
-}
+const configDir = "/usr/local/etc/onlineconf"
 
-var cfg map[string]*row = make(map[string]*row)
-
-//var file string = "/usr/local/etc/onlineconf/TREE.conf"
-var config_file string = fmt.Sprintf("/usr/local/etc/onlineconf/%s.conf", path.Base(os.Args[0]))
+var watcher *fsnotify.Watcher
 
 func init() {
-	read()
+	modules.byName = make(map[string]*Module)
+	modules.byFile = make(map[string]*Module)
+
+	var err error
+	watcher, err = fsnotify.NewWatcher()
+	if err != nil {
+		panic(err)
+	}
+
+	err = watcher.Add(configDir)
+	if err != nil {
+		panic(err)
+	}
 
 	go func() {
-		watcher, err := fsnotify.NewWatcher()
-
-		if err != nil {
-			panic(err)
-		}
-		defer watcher.Close()
-
-		err = watcher.Add(config_file)
-
-		if err != nil {
-			panic(err)
-		}
-
 		for {
 			select {
 			case ev := <-watcher.Events:
 				//log.Println("fsnotify event:", ev)
 
-				if ev.Op&fsnotify.Remove == fsnotify.Remove {
+				if ev.Op&fsnotify.Create == fsnotify.Create {
+					modules.Lock()
+					module, ok := modules.byFile[ev.Name]
+					modules.Unlock()
 
-					err = watcher.Add(config_file)
-					if err != nil {
-						panic(err)
+					if ok {
+						module.reopen()
 					}
-					read()
-				}
-
-				if (ev.Op&fsnotify.Create == fsnotify.Create) || (ev.Op&fsnotify.Write == fsnotify.Write) {
-					read()
 				}
 
 			case err := <-watcher.Errors:
-				log.Printf("Watch %v error: %v\n", config_file, err)
+				log.Printf("Watch %v error: %v\n", configDir, err)
 			}
 		}
 	}()
 }
 
-func read() {
-	log.Printf("Start read file %v\n", config_file)
-
-	f, err := os.Open(config_file)
-
-	if err != nil {
-		log.Printf("Open file %v error %v\n", config_file, err)
-		return
-	}
-
-	defer f.Close()
-
-	buff := make([]string, 2)
-	scan := bufio.NewScanner(f)
-
-	for scan.Scan() {
-		if buff = strings.SplitN(scan.Text(), " ", 2); len(buff) == 2 {
-			if val, ok := cfg[buff[0]]; ok {
-				if val.s != buff[1] {
-					val.c = false
-					val.s = buff[1]
-				}
-			} else {
-				cfg[buff[0]] = &row{
-					c: false,
-					s: buff[1],
-				}
-			}
-		}
-	}
-
-	log.Printf("Finish read file %v\n", config_file)
-}
-
-func GetAsInt(k string, d ...int) int {
-	if val, ok := cfg[k]; ok {
-		if val.c == true {
-			return val.i
-		}
-
-		i, err := strconv.Atoi(val.s)
-
-		if err != nil {
-			log.Printf("strconv.Atoi key %s error %v\n", k, config_file)
-		} else {
-			val.i = i
-			val.c = true
-
-			return i
-		}
-	}
-
-	if len(d) >= 1 {
-		return d[0]
-	}
-
-	panic(fmt.Sprintf("%v key not exist and default not found", k))
-}
-
-func GetAsString(k string, d ...string) string {
-	if val, ok := cfg[k]; ok {
-		return val.s
-	}
-
-	if len(d) >= 1 {
-		return d[0]
-	}
-
-	panic(fmt.Sprintf("%v key not exist and default not found", k))
-}
-
-func IfExistAsString(k string) (string, bool) {
-	if val, ok := cfg[k]; ok {
-		return val.s, ok
-	}
-
-	return "", false
-}
-
 func SetOutput(w io.Writer) {
 	log.SetOutput(w)
+}
+
+type Module struct {
+	sync.RWMutex
+	name string
+	file string
+	cdb  *cdb.Cdb
+}
+
+func newModule(name string) *Module {
+	file := fmt.Sprintf("%s/%s.cdb", configDir, name)
+	cdb, err := cdb.Open(file)
+	if err != nil {
+		panic(err)
+	}
+	return &Module{name: name, file: file, cdb: cdb}
+}
+
+func (m *Module) reopen() {
+	log.Printf("Reopen %s\n", m.file)
+	m.Lock()
+	defer m.Unlock()
+	cdb, err := cdb.Open(m.file)
+	if err != nil {
+		log.Printf("Reopen file %v error: %v\n", m.file, err)
+	} else {
+		m.cdb.Close()
+		m.cdb = cdb
+	}
+}
+
+func (m *Module) get(path string) (byte, []byte) {
+	m.RLock()
+	defer m.RUnlock()
+	data, err := m.cdb.Data([]byte(path))
+	if err != nil || len(data) == 0 {
+		if err != io.EOF {
+			log.Printf("Get %v:%v error: %v", m.file, path, err)
+		}
+		return 0, data
+	}
+	return data[0], data[1:]
+}
+
+func (m *Module) GetStringIfExists(path string) (string, bool) {
+	format, data := m.get(path)
+	switch format {
+	case 0:
+		return "", false
+	case 's':
+		return string(data), true
+	default:
+		log.Printf("%s:%s: format is not string\n", m.name, path)
+		return "", false
+	}
+}
+
+func (m *Module) GetIntIfExists(path string) (int, bool) {
+	str, ok := m.GetStringIfExists(path)
+	if !ok {
+		return 0, false
+	}
+
+	i, err := strconv.Atoi(str)
+	if err != nil {
+		log.Printf("%s:%s: value is not an integer: %s\n", m.name, path, str)
+		return 0, false
+	}
+
+	return i, true
+}
+
+func (m *Module) GetString(path string, d ...string) string {
+	if val, ok := m.GetStringIfExists(path); ok {
+		return val
+	} else if len(d) > 0 {
+		return d[0]
+	} else {
+		panic(fmt.Sprintf("%s:%s key not exists and default not found", m.name, path))
+	}
+}
+
+func (m *Module) GetInt(path string, d ...int) int {
+	if val, ok := m.GetIntIfExists(path); ok {
+		return val
+	} else if len(d) > 0 {
+		return d[0]
+	} else {
+		panic(fmt.Sprintf("%s:%s key not exists and default not found", m.name, path))
+	}
+}
+
+var modules struct {
+	sync.Mutex
+	byName map[string]*Module
+	byFile map[string]*Module
+}
+
+func GetModule(name string) *Module {
+	modules.Lock()
+	defer modules.Unlock()
+
+	if module, ok := modules.byName[name]; ok {
+		return module
+	}
+
+	module := newModule(name)
+
+	modules.byName[module.name] = module
+	modules.byFile[module.file] = module
+
+	return module
+}
+
+var tree struct {
+	sync.Mutex
+	module *Module
+}
+
+func getTree() *Module {
+	if tree.module != nil {
+		return tree.module
+	}
+
+	tree.Lock()
+	defer tree.Unlock()
+
+	if tree.module != nil {
+		return tree.module
+	}
+
+	tree.module = GetModule("TREE")
+	return tree.module
+}
+
+func GetStringIfExists(path string) (string, bool) {
+	return getTree().GetStringIfExists(path)
+}
+
+func GetIntIfExists(path string) (int, bool) {
+	return getTree().GetIntIfExists(path)
+}
+
+func GetString(path string, d ...string) string {
+	return getTree().GetString(path, d...)
+}
+
+func GetInt(path string, d ...int) int {
+	return getTree().GetInt(path, d...)
 }
