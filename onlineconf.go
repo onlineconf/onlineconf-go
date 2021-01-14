@@ -92,8 +92,8 @@ func (m *Module) reopen() {
 }
 
 func (m *Module) get(path string) (byte, []byte) {
-	m.m.RLock()
-	defer m.m.RUnlock()
+	m.m.Lock()
+	defer m.m.Unlock()
 	data, err := m.cdb.Data([]byte(path))
 	if err != nil || len(data) == 0 {
 		if err != io.EOF {
