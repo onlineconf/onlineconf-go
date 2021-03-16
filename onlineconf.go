@@ -19,13 +19,49 @@ import (
 	"github.com/grandecola/mmap"
 )
 
-const configDir = "/usr/local/etc/onlineconf"
+var defaultConfigDir = "/usr/local/etc/onlineconf"
 
+var watcherOnce sync.Once
 var watcher *fsnotify.Watcher
 
 func init() {
 	modules.byName = make(map[string]*Module)
 	modules.byFile = make(map[string]*Module)
+}
+
+// SetOutput sets the output destination for the standard logger.
+func SetOutput(w io.Writer) {
+	log.SetOutput(w)
+}
+
+type Module struct {
+	mutex       sync.RWMutex
+	name        string
+	filename    string
+	file        *os.File
+	mmappedFile *mmap.File
+	cdb         cdb.Reader
+}
+
+func newModule(name string) *Module {
+	filename := path.Join(defaultConfigDir, name)
+
+	ocModule := &Module{name: name, filename: filename}
+	err := ocModule.reopen()
+	if err != nil {
+		panic(err)
+	}
+
+	watcherOnce.Do(initWatcher)
+
+	return ocModule
+}
+
+func initWatcher() {
+
+	if watcher != nil {
+		return
+	}
 
 	var err error
 	watcher, err = fsnotify.NewWatcher()
@@ -33,7 +69,7 @@ func init() {
 		panic(err)
 	}
 
-	err = watcher.Add(configDir)
+	err = watcher.Add(defaultConfigDir)
 	if err != nil {
 		panic(err)
 	}
@@ -55,36 +91,10 @@ func init() {
 				}
 
 			case err := <-watcher.Errors:
-				log.Printf("Watch %v error: %v\n", configDir, err)
+				log.Printf("Watch %v error: %v\n", defaultConfigDir, err)
 			}
 		}
 	}()
-}
-
-// SetOutput sets the output destination for the standard logger.
-func SetOutput(w io.Writer) {
-	log.SetOutput(w)
-}
-
-type Module struct {
-	mutex       sync.RWMutex
-	name        string
-	filename    string
-	file        *os.File
-	mmappedFile *mmap.File
-	cdb         cdb.Reader
-}
-
-func newModule(name string) *Module {
-	filename := path.Join(configDir, name)
-
-	ocModule := &Module{name: name, filename: filename}
-	err := ocModule.reopen()
-	if err != nil {
-		panic(err)
-	}
-
-	return ocModule
 }
 
 func (m *Module) reopen() error {
@@ -218,13 +228,12 @@ func (m *Module) GetInt(path string, d ...int) int {
 }
 
 var modules struct {
-	sync.Mutex
+	sync.RWMutex
 	byName map[string]*Module
 	byFile map[string]*Module
 }
 
 // GetModule returns a named module.
-// It panics if module not exists.
 func GetModule(name string) *Module {
 	modules.Lock()
 	defer modules.Unlock()
