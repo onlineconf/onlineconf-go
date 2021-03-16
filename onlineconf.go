@@ -79,7 +79,10 @@ func newModule(name string) *Module {
 	filename := path.Join(configDir, name)
 
 	ocModule := &Module{name: name, filename: filename}
-	ocModule.reopen()
+	err := ocModule.reopen()
+	if err != nil {
+		panic(err)
+	}
 
 	return ocModule
 }
