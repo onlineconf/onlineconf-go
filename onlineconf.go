@@ -38,13 +38,12 @@ type Module struct {
 	mutex       sync.RWMutex
 	name        string
 	filename    string
-	file        *os.File
 	mmappedFile *mmap.File
 	cdb         cdb.Reader
 }
 
 func newModule(name string) *Module {
-	filename := path.Join(defaultConfigDir, name)
+	filename := path.Join(defaultConfigDir, name+".cdb")
 
 	ocModule := &Module{name: name, filename: filename}
 	err := ocModule.reopen()
@@ -103,50 +102,35 @@ func (m *Module) reopen() error {
 	defer m.mutex.Unlock()
 
 	oldMmappedFile := m.mmappedFile
-	oldFile := m.file
-
 	filename := m.filename
-
-	file_info, err := os.Stat(filename)
-	if err != nil {
-		return err
-	}
 
 	file, err := os.Open(filename)
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 
-	mmappedFile, err := mmap.NewSharedFileMmap(file, 0, int(file_info.Size()), syscall.PROT_READ)
+	fileInfo, err := file.Stat()
 	if err != nil {
-		file.Close()
 		return err
 	}
 
-	err = mmappedFile.Lock()
+	mmappedFile, err := mmap.NewSharedFileMmap(file, 0, int(fileInfo.Size()), syscall.PROT_READ)
 	if err != nil {
-		file.Close()
-		mmappedFile.Unmap()
-		return err
+		return fmt.Errorf("reopen shared mmap file: %w", err)
 	}
 
 	cdb := cdb.New()
 	scdReader, err := cdb.GetReader(mmappedFile)
 	if err != nil {
-		file.Close()
 		mmappedFile.Unmap()
 		return err
 	}
 
-	m.file = file
 	m.cdb = scdReader
 
 	if oldMmappedFile != nil {
 		oldMmappedFile.Unmap()
-	}
-
-	if oldFile != nil {
-		oldFile.Close()
 	}
 
 	return nil
@@ -158,7 +142,7 @@ func (m *Module) get(path string) (byte, []byte) {
 	data, err := m.cdb.Get([]byte(path))
 	if err != nil || len(data) == 0 {
 		if err != io.EOF {
-			log.Printf("Get %v:%v error: %v", m.file, path, err)
+			log.Printf("Get %v:%v error: %v", m.filename, path, err)
 		}
 		return 0, data
 	}
