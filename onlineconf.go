@@ -8,11 +8,15 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
+	"path"
 	"strconv"
 	"sync"
+	"syscall"
 
+	"github.com/alldroll/cdb"
 	"github.com/fsnotify/fsnotify"
-	"github.com/jbarham/go-cdb"
+	"github.com/grandecola/mmap"
 )
 
 const configDir = "/usr/local/etc/onlineconf"
@@ -63,38 +67,82 @@ func SetOutput(w io.Writer) {
 }
 
 type Module struct {
-	m    sync.RWMutex
-	name string
-	file string
-	cdb  *cdb.Cdb
+	mutex           sync.RWMutex
+	name        string
+	filename    string
+	file        *os.File
+	mmappedFile *mmap.File
+	cdb         cdb.Reader
 }
 
 func newModule(name string) *Module {
-	file := fmt.Sprintf("%s/%s.cdb", configDir, name)
-	cdb, err := cdb.Open(file)
-	if err != nil {
-		panic(err)
-	}
-	return &Module{name: name, file: file, cdb: cdb}
+	filename := path.Join(configDir, name)
+
+	ocModule := &Module{name: name, filename: filename}
+	ocModule.reopen()
+
+	return ocModule
 }
 
-func (m *Module) reopen() {
+func (m *Module) reopen() error {
 	log.Printf("Reopen %s\n", m.file)
-	m.m.Lock()
-	defer m.m.Unlock()
-	cdb, err := cdb.Open(m.file)
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	oldMmappedFile := m.mmappedFile
+	oldFile := m.file
+
+	filename := m.filename
+
+	file_info, err := os.Stat(filename)
 	if err != nil {
-		log.Printf("Reopen file %v error: %v\n", m.file, err)
-	} else {
-		m.cdb.Close()
-		m.cdb = cdb
+		return err
 	}
+
+	file, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+
+	mmappedFile, err := mmap.NewSharedFileMmap(file, 0, int(file_info.Size()), syscall.PROT_READ)
+	if err != nil {
+		file.Close()
+		return err
+	}
+
+	err = mmappedFile.Lock()
+	if err != nil {
+		file.Close()
+		mmappedFile.Unmap()
+		return err
+	}
+
+	cdb := cdb.New()
+	scdReader, err := cdb.GetReader(mmappedFile)
+	if err != nil {
+		file.Close()
+		mmappedFile.Unmap()
+		return err
+	}
+
+	m.file = file
+	m.cdb = scdReader
+
+	if oldMmappedFile != nil {
+		oldMmappedFile.Unmap()
+	}
+
+	if oldFile != nil {
+		oldFile.Close()
+	}
+
+	return nil
 }
 
 func (m *Module) get(path string) (byte, []byte) {
-	m.m.Lock()
-	defer m.m.Unlock()
-	data, err := m.cdb.Data([]byte(path))
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	data, err := m.cdb.Get([]byte(path))
 	if err != nil || len(data) == 0 {
 		if err != io.EOF {
 			log.Printf("Get %v:%v error: %v", m.file, path, err)
@@ -185,7 +233,7 @@ func GetModule(name string) *Module {
 	module := newModule(name)
 
 	modules.byName[module.name] = module
-	modules.byFile[module.file] = module
+	modules.byFile[module.filename] = module
 
 	return module
 }
