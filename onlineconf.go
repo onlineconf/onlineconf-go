@@ -67,7 +67,7 @@ func SetOutput(w io.Writer) {
 }
 
 type Module struct {
-	mutex           sync.RWMutex
+	mutex       sync.RWMutex
 	name        string
 	filename    string
 	file        *os.File
@@ -85,7 +85,7 @@ func newModule(name string) *Module {
 }
 
 func (m *Module) reopen() error {
-	log.Printf("Reopen %s\n", m.file)
+	log.Printf("Reopen %s\n", m.filename)
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -140,8 +140,8 @@ func (m *Module) reopen() error {
 }
 
 func (m *Module) get(path string) (byte, []byte) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
 	data, err := m.cdb.Get([]byte(path))
 	if err != nil || len(data) == 0 {
 		if err != io.EOF {
