@@ -19,7 +19,7 @@ import (
 	"github.com/grandecola/mmap"
 )
 
-var defaultConfigDir = "/usr/local/etc/onlineconf"
+var DefaultConfigDir = "/usr/local/etc/onlineconf"
 
 var watcherOnce sync.Once
 var watcher *fsnotify.Watcher
