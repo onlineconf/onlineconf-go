@@ -43,7 +43,7 @@ type Module struct {
 }
 
 func newModule(name string) *Module {
-	filename := path.Join(defaultConfigDir, name+".cdb")
+	filename := path.Join(DefaultConfigDir, name+".cdb")
 
 	ocModule := &Module{name: name, filename: filename}
 	err := ocModule.reopen()
@@ -68,7 +68,7 @@ func initWatcher() {
 		panic(err)
 	}
 
-	err = watcher.Add(defaultConfigDir)
+	err = watcher.Add(DefaultConfigDir)
 	if err != nil {
 		panic(err)
 	}
@@ -90,7 +90,7 @@ func initWatcher() {
 				}
 
 			case err := <-watcher.Errors:
-				log.Printf("Watch %v error: %v\n", defaultConfigDir, err)
+				log.Printf("Watch %v error: %v\n", DefaultConfigDir, err)
 			}
 		}
 	}()
