@@ -1,4 +1,4 @@
-package onlineconf_test
+package onlineconf
 
 import (
 	"fmt"
@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/alldroll/cdb"
+	"github.com/colinmarc/cdb"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -19,7 +19,9 @@ type testCDBRecord struct {
 type OCTestSuite struct {
 	suite.Suite
 	cdbFile   *os.File
-	cdbHandle *cdb.CDB
+	cdbReader *cdb.CDB
+	cdbWriter *cdb.Writer
+
 
 	testRecordsStr []testCDBRecord
 	testRecordsInt []testCDBRecord
@@ -31,16 +33,14 @@ func TestOCTestSuite(t *testing.T) {
 	suite.Run(t, new(OCTestSuite))
 }
 
-func (suite *OCTestSuite) getCDBReader() cdb.Reader {
+func (suite *OCTestSuite) getCDBReader() *cdb.CDB {
 	// initialize reader
-	reader, err := suite.cdbHandle.GetReader(suite.cdbFile)
-	suite.Require().Nilf(err, "Can't get CDB reader: %#v", err)
-	return reader
+	return suite.cdbReader
 }
 
-func (suite *OCTestSuite) getCDBWriter() cdb.Writer {
+func (suite *OCTestSuite) getCDBWriter() *cdb.Writer {
 	// initialize writer
-	writer, err := suite.cdbHandle.GetWriter(suite.cdbFile)
+	writer, err := cdb.Create(suite.cdbFile.Name())
 	suite.Require().Nilf(err, "Can't get CDB writer: %#v", err)
 	return writer
 }
@@ -72,20 +72,17 @@ func (suite *OCTestSuite) SetupTest() {
 	suite.Require().Nilf(err, "Can't open temporary file: %#v", err)
 
 	suite.cdbFile = f
-	suite.cdbHandle = cdb.New() // create new cdb handle
 
-	testRecordsStr, testRecordsInt := generateTestRecords(2)
+	suite.prepareTestData()
 
-	suite.testRecordsStr = testRecordsStr
-	suite.testRecordsInt = testRecordsInt
-
-	suite.fillTestCDB()
+	suite.cdbReader, err = cdb.New(f, nil) // create new cdb handle
+	suite.Require().NoError(err)
 
 	suite.module = &Module{name: "testmodule", filename: f.Name()}
 	suite.module.reopen()
 }
 
-func fillTestCDB(writer cdb.Writer, testRecordsStr, testRecordsInt []testCDBRecord) error {
+func fillTestCDB(writer *cdb.Writer, testRecordsStr, testRecordsInt []testCDBRecord) error {
 
 	allTestRecords := []testCDBRecord{}
 	allTestRecords = append(allTestRecords, testRecordsInt...)
@@ -104,7 +101,11 @@ func fillTestCDB(writer cdb.Writer, testRecordsStr, testRecordsInt []testCDBReco
 	return nil
 }
 
-func (suite *OCTestSuite) fillTestCDB() {
+func (suite *OCTestSuite) prepareTestData() {
+
+	testRecordsStr, testRecordsInt := generateTestRecords(2)
+	suite.testRecordsStr = testRecordsStr
+	suite.testRecordsInt = testRecordsInt
 
 	writer := suite.getCDBWriter()
 	err := fillTestCDB(writer, suite.testRecordsStr, suite.testRecordsInt)

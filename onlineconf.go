@@ -14,7 +14,7 @@ import (
 	"sync"
 	"syscall"
 
-	"github.com/alldroll/cdb"
+	"github.com/colinmarc/cdb"
 	"github.com/fsnotify/fsnotify"
 	"github.com/grandecola/mmap"
 )
@@ -39,7 +39,7 @@ type Module struct {
 	name        string
 	filename    string
 	mmappedFile *mmap.File
-	cdb         cdb.Reader
+	cdb         *cdb.CDB
 }
 
 func newModule(name string) *Module {
@@ -120,14 +120,13 @@ func (m *Module) reopen() error {
 		return fmt.Errorf("reopen shared mmap file: %w", err)
 	}
 
-	cdb := cdb.New()
-	scdReader, err := cdb.GetReader(mmappedFile)
+	cdb, err := cdb.New(mmappedFile, nil)
 	if err != nil {
 		mmappedFile.Unmap()
 		return err
 	}
 
-	m.cdb = scdReader
+	m.cdb = cdb
 
 	if oldMmappedFile != nil {
 		oldMmappedFile.Unmap()
