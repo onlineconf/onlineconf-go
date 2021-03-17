@@ -19,7 +19,7 @@ import (
 	"github.com/grandecola/mmap"
 )
 
-var DefaultConfigDir = "/usr/local/etc/onlineconf"
+var ConfigDir = "/usr/local/etc/onlineconf"
 
 var watcherOnce sync.Once
 var watcher *fsnotify.Watcher
@@ -43,7 +43,7 @@ type Module struct {
 }
 
 func newModule(name string) *Module {
-	filename := path.Join(DefaultConfigDir, name+".cdb")
+	filename := path.Join(ConfigDir, name+".cdb")
 
 	ocModule := &Module{name: name, filename: filename}
 	err := ocModule.reopen()
@@ -68,7 +68,7 @@ func initWatcher() {
 		panic(err)
 	}
 
-	err = watcher.Add(DefaultConfigDir)
+	err = watcher.Add(ConfigDir)
 	if err != nil {
 		panic(err)
 	}
@@ -90,7 +90,7 @@ func initWatcher() {
 				}
 
 			case err := <-watcher.Errors:
-				log.Printf("Watch %v error: %v\n", DefaultConfigDir, err)
+				log.Printf("Watch %v error: %v\n", ConfigDir, err)
 			}
 		}
 	}()

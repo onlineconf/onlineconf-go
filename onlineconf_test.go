@@ -1,4 +1,4 @@
-package onlineconf
+package onlineconf_test
 
 import (
 	"fmt"
