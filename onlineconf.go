@@ -19,9 +19,11 @@ import (
 	"github.com/grandecola/mmap"
 )
 
+// ConfigDir is path to all onlineconf modules. Can be overritten with Initialize().
+// Default value is "/usr/local/etc/onlineconf"
 var ConfigDir = "/usr/local/etc/onlineconf"
 
-var watcherOnce sync.Once
+var watcherLock sync.Mutex
 var watcher *fsnotify.Watcher
 
 func init() {
@@ -51,7 +53,9 @@ func newModule(name string) *Module {
 		panic(err)
 	}
 
-	watcherOnce.Do(initWatcher)
+	watcherLock.Lock()
+	initWatcher()
+	watcherLock.Unlock()
 
 	return ocModule
 }
@@ -231,6 +235,17 @@ func GetModule(name string) *Module {
 	modules.byFile[module.filename] = module
 
 	return module
+}
+
+// Initialize overwrites default ConfigDir for onlineconf modules
+func Initialize(newConfigDir string) {
+	watcherLock.Lock()
+	defer watcherLock.Unlock()
+	if watcher != nil {
+		panic("Initialize must be called before any onlineconf module was created")
+	}
+
+	ConfigDir = newConfigDir
 }
 
 var tree struct {
