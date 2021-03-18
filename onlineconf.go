@@ -19,9 +19,7 @@ import (
 	"github.com/grandecola/mmap"
 )
 
-// ConfigDir is path to all onlineconf modules. Can be overritten with Initialize().
-// Default value is "/usr/local/etc/onlineconf"
-var ConfigDir = "/usr/local/etc/onlineconf"
+var configDir = "/usr/local/etc/onlineconf"
 
 var watcherLock sync.Mutex
 var watcher *fsnotify.Watcher
@@ -237,7 +235,8 @@ func GetModule(name string) *Module {
 	return module
 }
 
-// Initialize overwrites default ConfigDir for onlineconf modules
+// Initialize sets config directory for onlineconf modules.
+// Default value is "/usr/local/etc/onlineconf"
 func Initialize(newConfigDir string) {
 	watcherLock.Lock()
 	defer watcherLock.Unlock()
