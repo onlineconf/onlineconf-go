@@ -43,7 +43,7 @@ type Module struct {
 }
 
 func newModule(name string) *Module {
-	filename := path.Join(ConfigDir, name+".cdb")
+	filename := path.Join(configDir, name+".cdb")
 
 	ocModule := &Module{name: name, filename: filename}
 	err := ocModule.reopen()
@@ -70,7 +70,7 @@ func initWatcher() {
 		panic(err)
 	}
 
-	err = watcher.Add(ConfigDir)
+	err = watcher.Add(configDir)
 	if err != nil {
 		panic(err)
 	}
@@ -92,7 +92,7 @@ func initWatcher() {
 				}
 
 			case err := <-watcher.Errors:
-				log.Printf("Watch %v error: %v\n", ConfigDir, err)
+				log.Printf("Watch %v error: %v\n", configDir, err)
 			}
 		}
 	}()
@@ -237,14 +237,14 @@ func GetModule(name string) *Module {
 
 // Initialize sets config directory for onlineconf modules.
 // Default value is "/usr/local/etc/onlineconf"
-func Initialize(newConfigDir string) {
+func Initialize(newconfigDir string) {
 	watcherLock.Lock()
 	defer watcherLock.Unlock()
 	if watcher != nil {
 		panic("Initialize must be called before any onlineconf module was created")
 	}
 
-	ConfigDir = newConfigDir
+	configDir = newconfigDir
 }
 
 var tree struct {
