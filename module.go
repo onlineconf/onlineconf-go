@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"sync"
 
 	"errors"
 
@@ -17,11 +18,15 @@ var ErrInvalidCDB = errors.New("cdb is inconsistent")
 type Module struct {
 	CDB cdb.Reader
 
-	stringParams map[string]string
-	intParams    map[string]int
-	boolParams   map[string]bool
+	stringParamsMu sync.RWMutex
+	stringParams   map[string]string
+	intParamsMu    sync.RWMutex
+	intParams      map[string]int
+	boolParamsMu   sync.RWMutex
+	boolParams     map[string]bool
 
-	notExistingParams map[string]struct{}
+	notExistingParamsMu sync.RWMutex
+	notExistingParams   map[string]struct{}
 }
 
 // NewModule
@@ -40,7 +45,8 @@ func NewModule(reader io.ReaderAt) (*Module, error) {
 		intParams:    make(map[string]int),
 		stringParams: make(map[string]string),
 
-		notExistingParams: make(map[string]struct{}),
+		notExistingParamsMu: sync.RWMutex{},
+		notExistingParams:   make(map[string]struct{}),
 	}
 
 	return module, nil
@@ -56,6 +62,88 @@ func NewPredeclaredModule(reader io.ReaderAt, paramsDescriptsion []ConfigParam) 
 	// todo fill params
 
 	return module, nil
+}
+
+// getCachedNotExist returns true is path not in module.
+// false returned in case we don't know either param exists or not exists
+func (m *Module) getCachedNotExist(path *ParamPath) bool {
+	m.notExistingParamsMu.RLock()
+	defer m.notExistingParamsMu.RUnlock()
+	_, ok := m.notExistingParams[path.path]
+	return ok
+}
+
+func (m *Module) setCachedNotExisting(pathParam *ParamPath) {
+
+	if ok := m.getCachedNotExist(pathParam); ok {
+		return
+	}
+
+	m.notExistingParamsMu.Lock()
+	m.notExistingParams[pathParam.path] = struct{}{}
+	defer m.notExistingParamsMu.Unlock()
+
+	return
+}
+
+func (m *Module) getStringCached(path *ParamPath) (string, bool) {
+	m.stringParamsMu.RLock()
+	defer m.stringParamsMu.RUnlock()
+
+	param, ok := m.stringParams[path.path]
+	return param, ok
+}
+
+func (m *Module) setStringCached(path *ParamPath, value string) {
+	if _, ok := m.getStringCached(path); ok {
+		return
+	}
+
+	m.stringParamsMu.Lock()
+	defer m.stringParamsMu.Unlock()
+
+	m.stringParams[path.path] = value
+	return
+}
+
+func (m *Module) getIntCached(path *ParamPath) (int, bool) {
+	m.intParamsMu.RLock()
+	defer m.intParamsMu.RUnlock()
+
+	param, ok := m.intParams[path.path]
+	return param, ok
+}
+
+func (m *Module) setIntCached(path *ParamPath, value int) {
+	if _, ok := m.getIntCached(path); ok {
+		return
+	}
+
+	m.intParamsMu.Lock()
+	defer m.intParamsMu.Unlock()
+
+	m.intParams[path.path] = value
+	return
+}
+
+func (m *Module) getBoolCached(path *ParamPath) (bool, bool) {
+	m.boolParamsMu.RLock()
+	defer m.boolParamsMu.RUnlock()
+
+	param, ok := m.boolParams[path.path]
+	return param, ok
+}
+
+func (m *Module) setBoolCached(path *ParamPath, value bool) {
+	if _, ok := m.getBoolCached(path); ok {
+		return
+	}
+
+	m.boolParamsMu.Lock()
+	defer m.boolParamsMu.Unlock()
+
+	m.boolParams[path.path] = value
+	return
 }
 
 type ctxConfigModuleKey struct{}

@@ -70,15 +70,12 @@ func (suite *OCTestSuite) SetupTest() {
 	f, err := ioutil.TempFile("", "test_*.cdb")
 	suite.Require().Nilf(err, "Can't open temporary file: %#v", err)
 
+	fmt.Printf("setd cdb: %s\n", f.Name())
+
 	suite.cdbFile = f
 	suite.cdbHandle = cdb.New() // create new cdb handle
 
-	testRecordsStr, testRecordsInt := generateTestRecords(2)
-
-	suite.testRecordsStr = testRecordsStr
-	suite.testRecordsInt = testRecordsInt
-
-	suite.fillTestCDB()
+	suite.prepareTestData()
 
 	mr, err := NewModuleReloader(&ReloaderOptions{FilePath: f.Name()})
 	suite.Nilf(err, "Cant init onlineconf module!: %#v", err)
@@ -92,7 +89,7 @@ func (suite *OCTestSuite) TearDownTest() {
 	err = suite.cdbFile.Close()
 	suite.Nilf(err, "Can't close cdb file: %#v", err)
 
-	err = os.Remove(suite.cdbFile.Name())
+	// err = os.Remove(suite.cdbFile.Name())
 	suite.Nilf(err, "Can't remove cdb file: %#v", err)
 }
 
@@ -115,7 +112,12 @@ func fillTestCDB(writer cdb.Writer, testRecordsStr, testRecordsInt []testCDBReco
 	return nil
 }
 
-func (suite *OCTestSuite) fillTestCDB() {
+func (suite *OCTestSuite) prepareTestData() {
+
+	testRecordsStr, testRecordsInt := generateTestRecords(2)
+
+	suite.testRecordsStr = testRecordsStr
+	suite.testRecordsInt = testRecordsInt
 
 	writer := suite.getCDBWriter()
 	err := fillTestCDB(writer, suite.testRecordsStr, suite.testRecordsInt)
@@ -127,22 +129,24 @@ func (suite *OCTestSuite) TestInt() {
 	module := suite.mr.Module()
 
 	for _, testRec := range suite.testRecordsInt {
-		ocInt, ok := module.Int(string(testRec.key))
-		suite.True(ok, "Cant find key %s in test onlineconf", string(testRec.key))
+		intPath := MustParamPath(string(testRec.key))
+		ocInt, err := module.Int(intPath)
+		suite.NoErrorf(err, "Cant find key %s in test onlineconf", string(testRec.key))
 		testInt, err := strconv.Atoi(string(testRec.val[1:]))
 		if err != nil {
 			panic(fmt.Errorf("Cant parse test record int: %w", err))
 		}
 		suite.Equal(ocInt, testInt)
 
-		ocInt, ok = module.IntWithDef(string(testRec.key), 0)
-		suite.True(ok, "Cant find key %s in test onlineconf", string(testRec.key))
+		ocInt, err = module.IntWithDef(intPath, 0)
+		suite.NoErrorf(err, "Cant find key %s in test onlineconf", string(testRec.key))
 		suite.Equal(ocInt, testInt)
 	}
 
 	for i, testRec := range suite.testRecordsInt {
-		ocInt, ok := module.IntWithDef(string(testRec.key)+"_not_exists", i)
-		suite.False(ok, "Cant find key %s in test onlineconf", string(testRec.key))
+		intPath := MustParamPath(string(testRec.key) + "_not_exists")
+		ocInt, err := module.IntWithDef(intPath, i)
+		suite.True(IsErrKeyNotFound(err), "non existing path: %s", string(testRec.key))
 		suite.Equal(ocInt, i, "Default result was returned")
 	}
 }
@@ -151,20 +155,22 @@ func (suite *OCTestSuite) TestString() {
 	module := suite.mr.Module()
 
 	for _, testRec := range suite.testRecordsStr {
-		ocStr, ok := module.String(string(testRec.key))
-		suite.True(ok, "Cant find key %s in test onlineconf", string(testRec.key))
+		strPath := MustParamPath(string(testRec.key))
+		ocStr, err := module.String(strPath)
+		suite.NoErrorf(err, "Cant find key %s in test onlineconf", string(testRec.key))
 		suite.Equal(string(testRec.val[1:]), ocStr)
 
-		ocStr, ok = module.StringWithDef(string(testRec.key), "")
-		suite.True(ok, "Cant find key %s in test onlineconf", string(testRec.key))
+		ocStr, err = module.StringWithDef(strPath, "")
+		suite.NoErrorf(err, "Cant find key %s in test onlineconf", string(testRec.key))
 		suite.Equal(string(testRec.val[1:]), ocStr)
 
 	}
 
 	for i, testRec := range suite.testRecordsStr {
 		defaultParamValue := "test_not_exists_" + strconv.Itoa(i)
-		ocStr, ok := module.StringWithDef(string(testRec.key)+"_not_exists", defaultParamValue)
-		suite.False(ok, "Cant find key %s in test onlineconf", string(testRec.key))
+		strPath := MustParamPath(string(testRec.key) + "_not_exists")
+		ocStr, err := module.StringWithDef(strPath, defaultParamValue)
+		suite.True(IsErrKeyNotFound(err), "non existing path: %s", string(testRec.key))
 		suite.Equal(ocStr, defaultParamValue, "Default result was returned")
 	}
 }
