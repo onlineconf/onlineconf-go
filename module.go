@@ -15,15 +15,13 @@ var ErrInvalidCDB = errors.New("cdb is inconsistent")
 
 // Module is a structure that associated with onlineconf module file.
 type Module struct {
+	CDB cdb.Reader
+
 	StringParams map[string]string
 	IntParams    map[string]int
+	BoolParams   map[string]bool
 
-	RawJSONParams            map[string]string // Here will be all JSON params (not parsed)
-	MapStringInterfaceParams map[string]map[string]interface{}
-	MapIntIntParams          map[string]map[int]int
-	MapIntStringParams       map[string]map[int]string
-	MapStringIntParams       map[string]map[string]int
-	MapStringStringParams    map[string]map[string]string
+	ModuleConfig []ConfigParam
 }
 
 // NewModule parses cdb file and copies all content to local maps.
@@ -36,21 +34,22 @@ func NewModule(reader io.ReaderAt) (*Module, error) {
 	}
 
 	module := &Module{
-		StringParams: map[string]string{},
-		IntParams:    map[string]int{},
-
-		RawJSONParams:            map[string]string{},
-		MapStringInterfaceParams: map[string]map[string]interface{}{},
-		MapIntIntParams:          map[string]map[int]int{},
-		MapIntStringParams:       map[string]map[int]string{},
-		MapStringIntParams:       map[string]map[string]int{},
-		MapStringStringParams:    map[string]map[string]string{},
+		CDB: cdbReader,
 	}
 
-	err = module.fillParams(cdbReader)
+	return module, nil
+}
+
+// NewModule parses cdb file and copies all content to local maps.
+// Module returned by this method will never be updated
+func NewPredeclaredModule(reader io.ReaderAt, paramsDescriptsion []ConfigParam) (*Module, error) {
+	module, err := NewModule(reader)
 	if err != nil {
 		return nil, err
 	}
+
+	// todo fill params
+
 	return module, nil
 }
 
@@ -86,16 +85,16 @@ func (m *Module) fillParams(cdb cdb.Reader) error {
 		// onlineconf currently knows 's' and 'j' data types
 		paramTypeByte := val[0]
 		keyStr := string(key)
-		valStr := string(val[1:])
+		// valStr := string(val[1:])
 		// такого треша, конечно же, не было бы, если бы в онлайнконфе
 		// была бы типизация
 		if paramTypeByte == 's' { // params type string
-			m.parseSimpleParams(keyStr, valStr)
+			// m.parseSimpleParams(keyStr, valStr)
 		} else if paramTypeByte == 'j' { // params type JSON
-			err := m.parseJSONParams(keyStr, valStr)
-			if err != nil {
-				return err
-			}
+			// err := m.parseJSONParams(keyStr, valStr)
+			// if err != nil {
+			// 	return err
+			// }
 		} else {
 			return fmt.Errorf("unknown paramTypeByte: %#v for key %s", paramTypeByte, keyStr)
 		}
