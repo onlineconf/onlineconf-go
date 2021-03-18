@@ -16,7 +16,7 @@ func TestMmapError(t *testing.T) {
 }
 
 func createBrokenCDB() (*os.File, error) {
-	f, err := ioutil.TempFile("", "test_*.cdb")
+	f, err := ioutil.TempFile("", "onlineconf_go_test_*.cdb")
 	if err != nil {
 		return nil, err
 	}
@@ -40,9 +40,9 @@ func TestInvalidCDB(t *testing.T) {
 	assert := assert.New(t)
 
 	f, err := createBrokenCDB()
-	assert.Nilf(err, "error while creating broken cdb: %#v", err)
+	assert.NoErrorf(err, "error while creating broken cdb: %#v", err)
 
 	_, err = loadModuleFromFile(f.Name())
 	// log.Printf("loadModuleFromFile err: %#v", err)
-	assert.NotNil(err)
+	assert.Errorf(err, "")
 }
