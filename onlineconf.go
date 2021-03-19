@@ -51,14 +51,14 @@ func newModule(name string) *Module {
 		panic(err)
 	}
 
-	watcherLock.Lock()
 	initWatcher()
-	watcherLock.Unlock()
 
 	return ocModule
 }
 
 func initWatcher() {
+	watcherLock.Lock()
+	defer watcherLock.Unlock()
 
 	if watcher != nil {
 		return
@@ -142,7 +142,7 @@ func (m *Module) get(path string) (byte, []byte) {
 	defer m.mutex.RUnlock()
 	data, err := m.cdb.Get([]byte(path))
 	if err != nil || len(data) == 0 {
-		if err != io.EOF {
+		if err != nil {
 			log.Printf("Get %v:%v error: %v", m.filename, path, err)
 		}
 		return 0, data
@@ -184,6 +184,22 @@ func (m *Module) GetIntIfExists(path string) (int, bool) {
 	return i, true
 }
 
+// GetBoolIfExists reads an integer value of a named parameter from the module.
+// It returns this value and the boolean true if the parameter exists and is an bool.
+// In the other case it returns the boolean false and 0.
+func (m *Module) GetBoolIfExists(path string) (bool, bool) {
+	str, ok := m.GetStringIfExists(path)
+	if !ok {
+		return false, false
+	}
+
+	if len(str) == 0 || str == "0" {
+		return false, true
+	}
+
+	return true, true
+}
+
 // GetString reads a string value of a named parameter from the module.
 // It returns this value if the parameter exists and is a string.
 // In the other case it panics unless default value is provided in
@@ -212,8 +228,22 @@ func (m *Module) GetInt(path string, d ...int) int {
 	}
 }
 
+// GetBool reads an bool value of a named parameter from the module.
+// It returns this value if the parameter exists and is an bool.
+// In the other case it panics unless default value is provided in
+// the second argument.
+func (m *Module) GetBool(path string, d ...bool) bool {
+	if val, ok := m.GetBoolIfExists(path); ok {
+		return val
+	} else if len(d) > 0 {
+		return d[0]
+	} else {
+		panic(fmt.Sprintf("%s:%s key not exists and default not found", m.name, path))
+	}
+}
+
 var modules struct {
-	sync.RWMutex
+	sync.Mutex
 	byName map[string]*Module
 	byFile map[string]*Module
 }
@@ -237,14 +267,14 @@ func GetModule(name string) *Module {
 
 // Initialize sets config directory for onlineconf modules.
 // Default value is "/usr/local/etc/onlineconf"
-func Initialize(newconfigDir string) {
+func Initialize(newConfigDir string) {
 	watcherLock.Lock()
 	defer watcherLock.Unlock()
 	if watcher != nil {
 		panic("Initialize must be called before any onlineconf module was created")
 	}
 
-	configDir = newconfigDir
+	configDir = newConfigDir
 }
 
 var tree struct {
@@ -282,6 +312,13 @@ func GetIntIfExists(path string) (int, bool) {
 	return getTree().GetIntIfExists(path)
 }
 
+// GetBoolIfExists reads an bool value of a named parameter from the module "TREE".
+// It returns this value and the boolean true if the parameter exists and is an integer.
+// In the other case it returns the boolean false and 0.
+func GetBoolIfExists(path string) (bool, bool) {
+	return getTree().GetBoolIfExists(path)
+}
+
 // GetString reads a string value of a named parameter from the module "TREE".
 // It returns this value if the parameter exists and is a string.
 // In the other case it panics unless default value is provided in
@@ -291,9 +328,17 @@ func GetString(path string, d ...string) string {
 }
 
 // GetInt reads an integer value of a named parameter from the module "TREE".
-// It returns this value if the parameter exists and is an integer.
+// It returns this value if the parameter exists and is an bool.
 // In the other case it panics unless default value is provided in
 // the second argument.
 func GetInt(path string, d ...int) int {
 	return getTree().GetInt(path, d...)
+}
+
+// GetBool reads an bool value of a named parameter from the module "TREE".
+// It returns this value if the parameter exists and is an bool.
+// In the other case it panics unless default value is provided in
+// the second argument.
+func GetBool(path string, d ...bool) bool {
+	return getTree().GetBool(path, d...)
 }
