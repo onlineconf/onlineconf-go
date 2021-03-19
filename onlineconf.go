@@ -8,15 +8,13 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
 	"path"
 	"strconv"
 	"sync"
-	"syscall"
 
 	"github.com/colinmarc/cdb"
 	"github.com/fsnotify/fsnotify"
-	"github.com/grandecola/mmap"
+	"golang.org/x/exp/mmap"
 )
 
 var configDir = "/usr/local/etc/onlineconf"
@@ -38,7 +36,7 @@ type Module struct {
 	mutex       sync.RWMutex
 	name        string
 	filename    string
-	mmappedFile *mmap.File
+	mmappedFile *mmap.ReaderAt
 	cdb         *cdb.CDB
 }
 
@@ -104,34 +102,22 @@ func (m *Module) reopen() error {
 	defer m.mutex.Unlock()
 
 	oldMmappedFile := m.mmappedFile
-	filename := m.filename
 
-	file, err := os.Open(filename)
+	mmappedFile, err := mmap.Open(m.filename)
 	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	fileInfo, err := file.Stat()
-	if err != nil {
-		return err
-	}
-
-	mmappedFile, err := mmap.NewSharedFileMmap(file, 0, int(fileInfo.Size()), syscall.PROT_READ)
-	if err != nil {
-		return fmt.Errorf("reopen shared mmap file: %w", err)
+		return fmt.Errorf("mmap Open module: %w", err)
 	}
 
 	cdb, err := cdb.New(mmappedFile, nil)
 	if err != nil {
-		mmappedFile.Unmap()
+		mmappedFile.Close()
 		return err
 	}
 
 	m.cdb = cdb
 
 	if oldMmappedFile != nil {
-		oldMmappedFile.Unmap()
+		oldMmappedFile.Close()
 	}
 
 	return nil
