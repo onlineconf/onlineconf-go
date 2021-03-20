@@ -46,7 +46,7 @@ func BenchmarkModuleReload(t *testing.B) {
 	t.ResetTimer()
 
 	for i := 0; i < t.N; i++ {
-		mr.reload()
+		mr.Reload()
 	}
 
 	t.StopTimer()

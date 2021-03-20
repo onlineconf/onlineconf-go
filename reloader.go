@@ -3,7 +3,6 @@ package onlineconf
 import (
 	"context"
 	"fmt"
-	"log"
 	"path"
 	"sync"
 
@@ -25,12 +24,10 @@ type ReloaderOptions struct {
 
 // ModuleReloader watchers for module updates and reloads it
 type ModuleReloader struct {
-	module         *Module
-	modMu          *sync.RWMutex // module mutex
-	ops            *ReloaderOptions
-	inotifyWatcher *fsnotify.Watcher
-	watherStop     chan struct{}
-	cdbFile        *mmap.ReaderAt
+	module  *Module
+	modMu   *sync.RWMutex // module mutex
+	ops     *ReloaderOptions
+	cdbFile *mmap.ReaderAt
 }
 
 // Reloader returns reloader for specified module
@@ -111,33 +108,15 @@ func NewModuleReloader(ops *ReloaderOptions) (*ModuleReloader, error) {
 	}
 
 	mr := ModuleReloader{
-		ops:        ops,
-		modMu:      &sync.RWMutex{},
-		watherStop: make(chan struct{}),
+		ops:   ops,
+		modMu: &sync.RWMutex{},
 	}
-	err := mr.reload()
-	if err != nil {
-		return nil, err
-	}
-
-	err = mr.startWatcher()
+	err := mr.Reload()
 	if err != nil {
 		return nil, err
 	}
 
 	return &mr, nil
-}
-
-// Close closes inofitify watcher. Module will not be updated anymore.
-func (mr *ModuleReloader) Close() error {
-
-	defer func() {
-		mr.inotifyWatcher = nil
-	}()
-
-	mr.watherStop <- struct{}{}
-
-	return mr.inotifyWatcher.Close()
 }
 
 // Module returns the last successfully updated version of module
@@ -148,48 +127,49 @@ func (mr *ModuleReloader) Module() *Module {
 	return mod
 }
 
-// todo remove it
-func (mr *ModuleReloader) startWatcher() error {
+func (mr *ModuleReloader) RunWatcher(ctx context.Context) error {
 	var watcher *fsnotify.Watcher
-
-	if mr.inotifyWatcher != nil {
-		return fmt.Errorf("inotify watcher is already started")
-	}
 
 	watcher, err := fsnotify.NewWatcher()
 	if err != nil {
-		return fmt.Errorf("Cant init inotify watcher: %w", err)
+		return fmt.Errorf("can't init inotify watcher: %w", err)
 	}
 
-	mr.inotifyWatcher = watcher
-
-	err = mr.inotifyWatcher.Add(mr.ops.FilePath)
+	err = watcher.Add(mr.ops.FilePath)
 	if err != nil {
-		return fmt.Errorf("Cant add inotify watcher for module %s: %w", mr.ops.Name, err)
+		return fmt.Errorf("can't add inotify watcher for module %s: %w", mr.ops.Name, err)
 	}
 
-	go func() {
-		for {
-			select {
-			case ev := <-watcher.Events:
-				if ev.Op&fsnotify.Create == fsnotify.Create {
-					mr.reload()
-				}
-			case err := <-watcher.Errors:
-				if err != nil {
-					log.Printf("Watch %v error: %v\n", mr.ops.Dir, err)
-				}
-			case <-mr.watherStop:
-				log.Println("Stopping inotify watcher")
-				return
+	var watcherLoopErr error
+	for {
+		select {
+		case ev := <-watcher.Events:
+			if ev.Op&fsnotify.Create == fsnotify.Create {
+				watcherLoopErr = mr.Reload()
+				break
 			}
+		case err := <-watcher.Errors:
+			if err != nil {
+				watcherLoopErr = fmt.Errorf("onlineconf reloader (%s) fsnotify watcher failed: %w", mr.ops.Name, err)
+				break
+			}
+		case <-ctx.Done():
+			break
 		}
-	}()
+	}
 
-	return nil
+	closeErr := watcher.Close()
+	if watcherLoopErr != nil && closeErr != nil {
+		return fmt.Errorf("%w and %w", closeErr, watcherLoopErr)
+	}
+	if watcherLoopErr != nil {
+		return watcherLoopErr
+	}
+
+	return closeErr
 }
 
-func (mr *ModuleReloader) reload() error {
+func (mr *ModuleReloader) Reload() error {
 
 	cdbFile, err := mmap.Open(mr.ops.FilePath)
 	if err != nil {
