@@ -2,6 +2,7 @@ package onlineconf
 
 type ConfigParam interface {
 	GetPath() *ParamPath
+	SetPath(*ParamPath) error
 }
 
 type ConfigParamInt struct {
@@ -34,6 +35,14 @@ func (param *ConfigParamInt) GetPath() *ParamPath {
 	return param.path
 }
 
+func (param *ConfigParamInt) SetPath(newPath *ParamPath) error {
+	if err := newPath.IsValid(); err != nil {
+		return err
+	}
+	param.path = newPath
+	return nil
+}
+
 type ConfigParamString struct {
 	Path    *ParamPath
 	Default string
@@ -62,6 +71,14 @@ func MustConfigParamString(path string, defaultValue string) *ConfigParamString 
 
 func (param *ConfigParamString) GetPath() *ParamPath {
 	return param.Path
+}
+
+func (param *ConfigParamString) SetPath(newPath *ParamPath) error {
+	if err := newPath.IsValid(); err != nil {
+		return err
+	}
+	param.Path = newPath
+	return nil
 }
 
 type ConfigParamBool struct {
@@ -93,6 +110,14 @@ func MustConfigParamBool(path string, defaultValue bool) *ConfigParamBool {
 
 func (param *ConfigParamBool) GetPath() *ParamPath {
 	return param.Path
+}
+
+func (param *ConfigParamBool) SetPath(newPath *ParamPath) error {
+	if err := newPath.IsValid(); err != nil {
+		return err
+	}
+	param.Path = newPath
+	return nil
 }
 
 func ParamsPrefix(prefix *ParamPath, confParams []ConfigParam) error {
