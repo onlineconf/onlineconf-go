@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/alldroll/cdb"
+	"github.com/colinmarc/cdb"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -29,16 +29,13 @@ func TestOCTestSuite(t *testing.T) {
 	suite.Run(t, new(OCTestSuite))
 }
 
-func (suite *OCTestSuite) getCDBReader() cdb.Reader {
-	// initialize reader
-	reader, err := suite.cdbHandle.GetReader(suite.cdbFile)
-	suite.Require().Nilf(err, "Can't get CDB reader: %#v", err)
-	return reader
+func (suite *OCTestSuite) getCDBReader() *cdb.CDB {
+	return suite.cdbHandle
 }
 
-func (suite *OCTestSuite) getCDBWriter() cdb.Writer {
+func (suite *OCTestSuite) getCDBWriter() *cdb.Writer {
 	// initialize writer
-	writer, err := suite.cdbHandle.GetWriter(suite.cdbFile)
+	writer, err := cdb.Create(suite.cdbFile.Name())
 	suite.Require().Nilf(err, "Can't get CDB writer: %#v", err)
 	return writer
 }
@@ -72,7 +69,7 @@ func (suite *OCTestSuite) SetupTest() {
 	suite.T().Logf("setd cdb: %s\n", f.Name())
 
 	suite.cdbFile = f
-	suite.cdbHandle = cdb.New() // create new cdb handle
+	suite.cdbHandle = suite.getCDBReader()
 
 	suite.prepareTestData()
 
@@ -82,17 +79,14 @@ func (suite *OCTestSuite) SetupTest() {
 }
 
 func (suite *OCTestSuite) TearDownTest() {
-	err := suite.mr.Close()
-	suite.Nilf(err, "Can't close module reloader: %#v", err)
-
-	err = suite.cdbFile.Close()
+	err := suite.cdbFile.Close()
 	suite.Nilf(err, "Can't close cdb file: %#v", err)
 
-	// err = os.Remove(suite.cdbFile.Name())
+	err = os.Remove(suite.cdbFile.Name())
 	suite.Nilf(err, "Can't remove cdb file: %#v", err)
 }
 
-func fillTestCDB(writer cdb.Writer, testRecordsStr, testRecordsInt []testCDBRecord) error {
+func fillTestCDB(writer *cdb.Writer, testRecordsStr, testRecordsInt []testCDBRecord) error {
 
 	allTestRecords := []testCDBRecord{}
 	allTestRecords = append(allTestRecords, testRecordsInt...)

@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/alldroll/cdb"
+	"github.com/colinmarc/cdb"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,7 +22,7 @@ func createCDB() (*os.File, error) {
 	if err != nil {
 		return nil, err
 	}
-	writer, err := cdb.New().GetWriter(f)
+	writer, err := cdb.NewWriter(f, nil)
 	if err != nil {
 		return nil, err
 	}

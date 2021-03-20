@@ -8,7 +8,7 @@ import (
 
 	"errors"
 
-	"github.com/alldroll/cdb"
+	"github.com/colinmarc/cdb"
 )
 
 // ErrInvalidCDB means that cdb is invalid
@@ -16,7 +16,7 @@ var ErrInvalidCDB = errors.New("cdb is inconsistent")
 
 // Module is a structure that associated with onlineconf module file.
 type Module struct {
-	CDB cdb.Reader
+	CDB *cdb.CDB
 
 	stringParamsMu sync.RWMutex
 	stringParams   map[string]string
@@ -32,7 +32,7 @@ type Module struct {
 // NewModule
 func NewModule(reader io.ReaderAt) (*Module, error) {
 
-	cdbReader, err := cdb.New().GetReader(reader)
+	cdbReader, err := cdb.New(reader, nil)
 	if err != nil {
 		return nil, fmt.Errorf("can't get cdb reader for module: %w", err)
 	}
