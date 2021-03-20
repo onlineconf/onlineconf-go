@@ -33,7 +33,7 @@ func newErrKeyNotFound(path string) *ErrKeyNotFound {
 func (m *Module) readBytes(paramPath *ParamPath) ([]byte, error) {
 	path := paramPath.path
 	stringData, err := m.CDB.Get([]byte(path))
-	fmt.Printf("reading key: %s, data: %s, err: %#v\n", path, string(stringData), err)
+
 	if stringData == nil && err == nil {
 		return nil, newErrKeyNotFound(path)
 	}

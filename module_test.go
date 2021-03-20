@@ -1,7 +1,6 @@
 package onlineconf
 
 import (
-	"fmt"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -70,7 +69,7 @@ func (suite *OCTestSuite) SetupTest() {
 	f, err := ioutil.TempFile("", "test_*.cdb")
 	suite.Require().Nilf(err, "Can't open temporary file: %#v", err)
 
-	fmt.Printf("setd cdb: %s\n", f.Name())
+	suite.T().Logf("setd cdb: %s\n", f.Name())
 
 	suite.cdbFile = f
 	suite.cdbHandle = cdb.New() // create new cdb handle
@@ -133,9 +132,7 @@ func (suite *OCTestSuite) TestInt() {
 		ocInt, err := module.Int(intParam)
 		suite.NoErrorf(err, "Cant find key %s in test onlineconf", string(testRec.key))
 		testInt, err := strconv.Atoi(string(testRec.val[1:]))
-		if err != nil {
-			panic(fmt.Errorf("Cant parse test record int: %w", err))
-		}
+		suite.Require().NoErrorf(err, "Cant parse test record int: %w", err)
 		suite.Equal(ocInt, testInt)
 	}
 
@@ -159,7 +156,7 @@ func (suite *OCTestSuite) TestString() {
 
 	for i, testRec := range suite.testRecordsStr {
 		defaultParamValue := "test_not_exists_" + strconv.Itoa(i)
-		strParam := MustConfigParamString(string(testRec.key) + "_not_exists", defaultParamValue)
+		strParam := MustConfigParamString(string(testRec.key)+"_not_exists", defaultParamValue)
 		ocStr, err := module.String(strParam)
 		suite.True(IsErrKeyNotFound(err), "non existing path: %s", string(testRec.key))
 		suite.Equal(ocStr, defaultParamValue, "Default result was returned")

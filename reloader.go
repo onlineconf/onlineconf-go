@@ -148,6 +148,7 @@ func (mr *ModuleReloader) Module() *Module {
 	return mod
 }
 
+// todo remove it
 func (mr *ModuleReloader) startWatcher() error {
 	var watcher *fsnotify.Watcher
 
