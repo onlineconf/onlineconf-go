@@ -6,8 +6,8 @@ type ConfigParam interface {
 }
 
 type ConfigParamInt struct {
-	path    *ParamPath
-	Default int
+	path         *ParamPath
+	defaultValue int
 }
 
 var _ ConfigParam = (*ConfigParamInt)(nil) // compile time interface check
@@ -18,7 +18,7 @@ func NewConfigParamInt(path string, defaultValue int) (*ConfigParamInt, error) {
 		return nil, err
 	}
 
-	confParam := &ConfigParamInt{path: validPath, Default: defaultValue}
+	confParam := &ConfigParamInt{path: validPath, defaultValue: defaultValue}
 	return confParam, nil
 }
 
@@ -44,8 +44,8 @@ func (param *ConfigParamInt) SetPath(newPath *ParamPath) error {
 }
 
 type ConfigParamString struct {
-	Path    *ParamPath
-	Default string
+	path         *ParamPath
+	defaultValue string
 }
 
 var _ ConfigParam = (*ConfigParamString)(nil) // compile time interface check
@@ -56,7 +56,7 @@ func NewConfigParamString(path string, defaultValue string) (*ConfigParamString,
 		return nil, err
 	}
 
-	confParam := &ConfigParamString{Path: validPath, Default: defaultValue}
+	confParam := &ConfigParamString{path: validPath, defaultValue: defaultValue}
 	return confParam, nil
 }
 
@@ -70,21 +70,20 @@ func MustConfigParamString(path string, defaultValue string) *ConfigParamString 
 }
 
 func (param *ConfigParamString) GetPath() *ParamPath {
-	return param.Path
+	return param.path
 }
 
 func (param *ConfigParamString) SetPath(newPath *ParamPath) error {
 	if err := newPath.IsValid(); err != nil {
 		return err
 	}
-	param.Path = newPath
+	param.path = newPath
 	return nil
 }
 
 type ConfigParamBool struct {
-	Path     *ParamPath
-	Default  bool
-	Required bool
+	path         *ParamPath
+	defaultValue bool
 }
 
 var _ ConfigParam = (*ConfigParamBool)(nil) // compile time interface check
@@ -95,7 +94,7 @@ func NewConfigParamBool(path string, defaultValue bool) (*ConfigParamBool, error
 		return nil, err
 	}
 
-	confParam := &ConfigParamBool{Path: validPath, Default: defaultValue}
+	confParam := &ConfigParamBool{path: validPath, defaultValue: defaultValue}
 	return confParam, nil
 }
 
@@ -109,14 +108,14 @@ func MustConfigParamBool(path string, defaultValue bool) *ConfigParamBool {
 }
 
 func (param *ConfigParamBool) GetPath() *ParamPath {
-	return param.Path
+	return param.path
 }
 
 func (param *ConfigParamBool) SetPath(newPath *ParamPath) error {
 	if err := newPath.IsValid(); err != nil {
 		return err
 	}
-	param.Path = newPath
+	param.path = newPath
 	return nil
 }
 
