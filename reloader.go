@@ -160,7 +160,7 @@ func (mr *ModuleReloader) RunWatcher(ctx context.Context) error {
 
 	closeErr := watcher.Close()
 	if watcherLoopErr != nil && closeErr != nil {
-		return fmt.Errorf("%w and %w", closeErr, watcherLoopErr)
+		return fmt.Errorf("closeErr: %w, watcherLoopErr: %w", closeErr, watcherLoopErr)
 	}
 	if watcherLoopErr != nil {
 		return watcherLoopErr
