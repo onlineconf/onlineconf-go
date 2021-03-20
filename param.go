@@ -2,47 +2,66 @@ package onlineconf
 
 type ConfigParam interface {
 	GetPath() *ParamPath
-	SetPath(*ParamPath) error
 }
 
 type ConfigParamInt struct {
-	Path     *ParamPath
-	Default  int
-	Required bool
+	path    *ParamPath
+	Default int
 }
 
 var _ ConfigParam = (*ConfigParamInt)(nil) // compile time interface check
 
-func (param *ConfigParamInt) GetPath() *ParamPath {
-	return param.Path
+func NewConfigParamInt(path string, defaultValue int) (*ConfigParamInt, error) {
+	validPath, err := NewParamPath(path)
+	if err != nil {
+		return nil, err
+	}
+
+	confParam := &ConfigParamInt{path: validPath, Default: defaultValue}
+	return confParam, nil
 }
 
-func (param *ConfigParamInt) SetPath(newPath *ParamPath) error {
-	if err := newPath.IsValid(); err != nil {
-		return err
+func MustConfigParamInt(path string, defaultValue int) *ConfigParamInt {
+	configParam, err := NewConfigParamInt(path, defaultValue)
+	if err != nil {
+		panic(err)
 	}
-	param.Path = newPath
-	return nil
+
+	return configParam
+}
+
+func (param *ConfigParamInt) GetPath() *ParamPath {
+	return param.path
 }
 
 type ConfigParamString struct {
-	Path     *ParamPath
-	Default  string
-	Required bool
+	Path    *ParamPath
+	Default string
 }
 
 var _ ConfigParam = (*ConfigParamString)(nil) // compile time interface check
 
-func (param *ConfigParamString) GetPath() *ParamPath {
-	return param.Path
+func NewConfigParamString(path string, defaultValue string) (*ConfigParamString, error) {
+	validPath, err := NewParamPath(path)
+	if err != nil {
+		return nil, err
+	}
+
+	confParam := &ConfigParamString{Path: validPath, Default: defaultValue}
+	return confParam, nil
 }
 
-func (param *ConfigParamString) SetPath(newPath *ParamPath) error {
-	if err := newPath.IsValid(); err != nil {
-		return err
+func MustConfigParamString(path string, defaultValue string) *ConfigParamString {
+	configParam, err := NewConfigParamString(path, defaultValue)
+	if err != nil {
+		panic(err)
 	}
-	param.Path = newPath
-	return nil
+
+	return configParam
+}
+
+func (param *ConfigParamString) GetPath() *ParamPath {
+	return param.Path
 }
 
 type ConfigParamBool struct {
@@ -53,16 +72,27 @@ type ConfigParamBool struct {
 
 var _ ConfigParam = (*ConfigParamBool)(nil) // compile time interface check
 
-func (param *ConfigParamBool) GetPath() *ParamPath {
-	return param.Path
+func NewConfigParamBool(path string, defaultValue bool) (*ConfigParamBool, error) {
+	validPath, err := NewParamPath(path)
+	if err != nil {
+		return nil, err
+	}
+
+	confParam := &ConfigParamBool{Path: validPath, Default: defaultValue}
+	return confParam, nil
 }
 
-func (param *ConfigParamBool) SetPath(newPath *ParamPath) error {
-	if err := newPath.IsValid(); err != nil {
-		return err
+func MustConfigParamBool(path string, defaultValue bool) *ConfigParamBool {
+	configParam, err := NewConfigParamBool(path, defaultValue)
+	if err != nil {
+		panic(err)
 	}
-	param.Path = newPath
-	return nil
+
+	return configParam
+}
+
+func (param *ConfigParamBool) GetPath() *ParamPath {
+	return param.Path
 }
 
 func ParamsPrefix(prefix *ParamPath, confParams []ConfigParam) error {

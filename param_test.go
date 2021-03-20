@@ -7,12 +7,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var testParamInt *ConfigParamInt = MustConfigParamInt("/onlineconf/test/int", 1)
+var testParamStrign *ConfigParamString = MustConfigParamString("/onlineconf/test/string", "test_string")
+var testParamBool *ConfigParamBool = MustConfigParamBool("/onlineconf/test/bool", true)
+
 func TestConfigParams(t *testing.T) {
 
 	var configParams = []ConfigParam{
-		&ConfigParamInt{MustParamPath("/onlineconf/test/int"), 1, false},
-		&ConfigParamString{MustParamPath("/onlineconf/test/string"), "test_string", false},
-		&ConfigParamBool{MustParamPath("/onlineconf/test/bool"), true, false},
+		testParamInt,
+		testParamStrign,
+		testParamBool,
 	}
 
 	origLen := len(configParams)
