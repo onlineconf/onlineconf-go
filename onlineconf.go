@@ -4,21 +4,3 @@
 // If onlineconf-updater modifies them, they are automatically reopened.
 package onlineconf
 
-import (
-	"golang.org/x/exp/mmap"
-)
-
-func loadModuleFromFile(filePath string) (*Module, error) {
-	cdbFile, err := mmap.Open(filePath)
-	if err != nil {
-		return nil, err
-	}
-	defer cdbFile.Close()
-
-	module, err := NewModule(cdbFile)
-	if err != nil {
-		return nil, err
-	}
-
-	return module, nil
-}

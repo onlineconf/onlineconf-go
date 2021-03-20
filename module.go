@@ -34,7 +34,7 @@ func NewModule(reader io.ReaderAt) (*Module, error) {
 
 	cdbReader, err := cdb.New().GetReader(reader)
 	if err != nil {
-		return nil, fmt.Errorf("Cant cant cdb reader for module: %w", err)
+		return nil, fmt.Errorf("can't get cdb reader for module: %w", err)
 	}
 
 	module := &Module{

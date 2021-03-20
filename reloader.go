@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"github.com/fsnotify/fsnotify"
+	"golang.org/x/exp/mmap"
 )
 
 // DefaultModulesDir defines default directory for modules
@@ -29,6 +30,7 @@ type ModuleReloader struct {
 	ops            *ReloaderOptions
 	inotifyWatcher *fsnotify.Watcher
 	watherStop     chan struct{}
+	cdbFile        *mmap.ReaderAt
 }
 
 // Reloader returns reloader for specified module
@@ -187,15 +189,34 @@ func (mr *ModuleReloader) startWatcher() error {
 }
 
 func (mr *ModuleReloader) reload() error {
-	module, err := loadModuleFromFile(mr.ops.FilePath)
+
+	cdbFile, err := mmap.Open(mr.ops.FilePath)
 	if err != nil {
-		// log.Printf("Cant reload module %s: %#v", mr.ops.Name, err)
+		return err
+	}
+
+	module, err := NewModule(cdbFile)
+	if err != nil {
+		return err
+	}
+
+	if err != nil {
 		return fmt.Errorf("can't reload module: %w", err)
 	}
 
+	oldCDB := mr.cdbFile
 	mr.modMu.Lock()
+	mr.cdbFile = cdbFile
 	mr.module = module
 	mr.modMu.Unlock()
+
+	if oldCDB != nil {
+		// todo we can't just close it here
+		// there could be any number of opened modules that
+		// the simplest way is to rely on mmap finalyzer
+		// oldCDB.Close()
+	}
+
 	return nil
 }
 
