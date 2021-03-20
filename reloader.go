@@ -141,20 +141,22 @@ func (mr *ModuleReloader) RunWatcher(ctx context.Context) error {
 	}
 
 	var watcherLoopErr error
+
+WATCHERLOOP:
 	for {
 		select {
 		case ev := <-watcher.Events:
-			if ev.Op&fsnotify.Create == fsnotify.Create {
+			if ev.Name == mr.ops.FilePath && ev.Op&fsnotify.Chmod == fsnotify.Chmod {
 				watcherLoopErr = mr.Reload()
-				break
+				break WATCHERLOOP
 			}
 		case err := <-watcher.Errors:
 			if err != nil {
 				watcherLoopErr = fmt.Errorf("onlineconf reloader (%s) fsnotify watcher failed: %w", mr.ops.Name, err)
-				break
+				break WATCHERLOOP
 			}
 		case <-ctx.Done():
-			break
+			break WATCHERLOOP
 		}
 	}
 
