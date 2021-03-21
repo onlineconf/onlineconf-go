@@ -224,14 +224,6 @@ func (suite *OCTestSuite) TestBool() {
 	suite.Assert().False(falseVal)
 }
 
-func (suite *OCTestSuite) TestReload() {
-	// todo
-}
-
-func (suite *OCTestSuite) TestUnknownParamType() {
-	// todo
-}
-
 func (suite *OCTestSuite) TestJSON() {
 	// todo
 }

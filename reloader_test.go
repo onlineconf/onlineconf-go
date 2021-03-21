@@ -1,9 +1,13 @@
 package onlineconf
 
 import (
+	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/colinmarc/cdb"
 	"github.com/stretchr/testify/assert"
@@ -56,4 +60,59 @@ func BenchmarkModuleReload(t *testing.B) {
 	}
 
 	t.StopTimer()
+}
+
+func (suite *OCTestSuite) TestReload() {
+
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		for {
+			err := suite.mr.RunWatcher(ctx)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "onlineconf reloader error: %s", err.Error())
+				continue
+			}
+			break
+		}
+
+		wg.Done()
+	}()
+
+	testPath := string(suite.testRecordsStr[0].key)
+	testValue := string(suite.testRecordsStr[0].val[1:])
+
+	module := suite.mr.Module()
+	val, err := module.String(MustConfigParamString(testPath, ""))
+	suite.Assert().Equal(val, testValue)
+	suite.Assert().NoError(err)
+
+	typeByte := "s"
+	newTestValue := "updated_ccb_value"
+	suite.testRecordsStr[0].val = []byte(typeByte + newTestValue)
+
+	// rewrite cdb data with updated key
+	writer := suite.getCDBWriter()
+	err = fillTestCDB(writer, suite.testRecordsStr)
+	suite.Require().NoError(err)
+	os.Chmod(suite.cdbFile.Name(), 0644)
+
+	time.Sleep(time.Second)
+
+	// old module instance returns old value
+	val, err = module.String(MustConfigParamString(testPath, ""))
+	suite.Assert().Equal(val, testValue)
+	suite.Assert().NoError(err)
+
+	newModule := suite.mr.Module()
+
+	val, err = newModule.String(MustConfigParamString(testPath, ""))
+	suite.Assert().Equal(newTestValue, val)
+	suite.Assert().NoError(err)
+
+	cancel()
+	wg.Wait()
 }
