@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/onlineconf/onlineconf-go"
 )
@@ -58,7 +59,23 @@ func main() {
 		return
 	}
 
-	go reloader.RunWatcher(context.Background())
+	ctx := context.Background()
+	ctx, cancel := context.WithCancel(ctx)
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+
+	go func() {
+		for {
+			err := reloader.RunWatcher(ctx)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "onlineconf reloader error: %s", err.Error())
+				continue
+			}
+			break
+		}
+
+		wg.Done()
+	}()
 
 	for {
 		reader := bufio.NewReader(os.Stdin)
@@ -75,6 +92,9 @@ func main() {
 
 		readOCPath(module, onlineconfPath)
 	}
+
+	cancel()
+	wg.Wait()
 
 }
 

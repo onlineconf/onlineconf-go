@@ -160,15 +160,9 @@ WATCHERLOOP:
 		}
 	}
 
-	closeErr := watcher.Close()
-	if watcherLoopErr != nil && closeErr != nil {
-		return fmt.Errorf("closeErr: %w, watcherLoopErr: %w", closeErr, watcherLoopErr)
-	}
-	if watcherLoopErr != nil {
-		return watcherLoopErr
-	}
+	watcher.Close()
 
-	return closeErr
+	return watcherLoopErr
 }
 
 func (mr *ModuleReloader) Reload() error {
