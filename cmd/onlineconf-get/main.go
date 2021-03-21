@@ -115,5 +115,4 @@ func readOCPath(module *onlineconf.Module, path string) {
 	}
 
 	fmt.Println(value)
-	return
 }

@@ -22,7 +22,8 @@ func TestConfigParams(t *testing.T) {
 	origLen := len(configParams)
 
 	configPrefix := MustParamPath("/")
-	ParamsPrefix(configPrefix, configParams)
+	err := ParamsPrefix(configPrefix, configParams)
+	assert.NoError(t, err)
 
 	assert.Len(t, configParams, origLen, "configParams length not changed")
 

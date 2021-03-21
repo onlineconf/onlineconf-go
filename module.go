@@ -82,8 +82,6 @@ func (m *Module) setCachedNotExisting(pathParam *ParamPath) {
 	m.notExistingParamsMu.Lock()
 	m.notExistingParams[pathParam.path] = struct{}{}
 	defer m.notExistingParamsMu.Unlock()
-
-	return
 }
 
 func (m *Module) getStringCached(path *ParamPath) (string, bool) {
@@ -103,7 +101,6 @@ func (m *Module) setStringCached(path *ParamPath, value string) {
 	defer m.stringParamsMu.Unlock()
 
 	m.stringParams[path.path] = value
-	return
 }
 
 func (m *Module) getIntCached(path *ParamPath) (int, bool) {
@@ -123,7 +120,6 @@ func (m *Module) setIntCached(path *ParamPath, value int) {
 	defer m.intParamsMu.Unlock()
 
 	m.intParams[path.path] = value
-	return
 }
 
 func (m *Module) getBoolCached(path *ParamPath) (bool, bool) {
@@ -143,7 +139,6 @@ func (m *Module) setBoolCached(path *ParamPath, value bool) {
 	defer m.boolParamsMu.Unlock()
 
 	m.boolParams[path.path] = value
-	return
 }
 
 type ctxConfigModuleKey struct{}

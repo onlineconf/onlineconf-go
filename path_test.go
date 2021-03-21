@@ -27,8 +27,6 @@ func TestParamPathHappyCases(t *testing.T) {
 		require.NotNil(t, rootPath, "rootPath must be not nil for happy cases")
 		assert.Equal(t, rootPath.String(), testCase.path, "NewParamPath check string path: "+testCase.description)
 	}
-
-	return
 }
 
 func TestParamPathUnhappyCases(t *testing.T) {
@@ -45,8 +43,6 @@ func TestParamPathUnhappyCases(t *testing.T) {
 		assert.Equal(t, err, testCase.expectedErr, fmt.Sprintf("NewParamPath check path `%s` description : %s", testCase.path, testCase.description))
 		assert.Nil(t, rootPath, "rootPath must be nil for unhappy cases")
 	}
-
-	return
 }
 
 func TestParamPathJoin(t *testing.T) {

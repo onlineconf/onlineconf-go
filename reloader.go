@@ -181,18 +181,18 @@ func (mr *ModuleReloader) Reload() error {
 		return fmt.Errorf("can't reload module: %w", err)
 	}
 
-	oldCDB := mr.cdbFile
+	// oldCDB := mr.cdbFile
 	mr.modMu.Lock()
 	mr.cdbFile = cdbFile
 	mr.module = module
 	mr.modMu.Unlock()
 
-	if oldCDB != nil {
-		// todo we can't just close it here
-		// there could be any number of opened modules that
-		// the simplest way is to rely on mmap finalyzer
-		// oldCDB.Close()
-	}
+	// todo we can't just close it here
+	// there could be any number of opened modules that
+	// the simplest way is to rely on mmap finalyzer
+	// if oldCDB != nil {
+	// 	oldCDB.Close()
+	// }
 
 	return nil
 }
