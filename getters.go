@@ -42,7 +42,7 @@ func (m *Module) readBytes(paramPath *ParamPath) ([]byte, error) {
 		return nil, fmt.Errorf("onlineconf module readSregin: %w", err)
 	}
 
-	if len(stringData) <= 1 {
+	if len(stringData) < 1 {
 		return nil, ErrBrokenCDB
 	}
 

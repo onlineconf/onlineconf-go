@@ -27,8 +27,14 @@ func createCDB() (*os.File, error) {
 		return nil, err
 	}
 
-	testRecordsStr, testRecordsInt := generateTestRecords(100000)
-	err = fillTestCDB(writer, testRecordsStr, testRecordsInt)
+	testRecordsStr, testRecordsInt, testRecordsBool := generateTestRecords(2)
+
+	allTestRecords := []testCDBRecord{}
+	allTestRecords = append(allTestRecords, testRecordsInt...)
+	allTestRecords = append(allTestRecords, testRecordsStr...)
+	allTestRecords = append(allTestRecords, testRecordsBool...)
+
+	err = fillTestCDB(writer, allTestRecords)
 	return f, err
 }
 

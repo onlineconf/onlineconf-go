@@ -19,8 +19,9 @@ type OCTestSuite struct {
 	cdbFile   *os.File
 	cdbHandle *cdb.CDB
 
-	testRecordsStr []testCDBRecord
-	testRecordsInt []testCDBRecord
+	testRecordsStr  []testCDBRecord
+	testRecordsInt  []testCDBRecord
+	testRecordsBool []testCDBRecord
 
 	mr *ModuleReloader
 }
@@ -40,26 +41,36 @@ func (suite *OCTestSuite) getCDBWriter() *cdb.Writer {
 	return writer
 }
 
+const TestOnlineConfTrue = "/test/onlineconf/bool_true"
+const TestOnlineConfFalse = "/test/onlineconf/bool_false"
+const TestOnlineConfEmpty = "/test/onlineconf/bool_empty"
+
 // generate test records
-func generateTestRecords(tesRecsCnt int) ([]testCDBRecord, []testCDBRecord) {
+func generateTestRecords(tesRecsCnt int) ([]testCDBRecord, []testCDBRecord, []testCDBRecord) {
 	testRecordsStr := make([]testCDBRecord, tesRecsCnt)
 	testRecordsInt := make([]testCDBRecord, tesRecsCnt)
 
+	typeByte := "s"
+
 	for i := 0; i < tesRecsCnt; i++ {
 		stri := strconv.Itoa(i)
-		typeByte := "s"
 		testRecordsStr[i].key = []byte("/test/onlineconf/str" + stri)
 		testRecordsStr[i].val = []byte(typeByte + "val" + stri)
-
-		// log.Printf("key %s val %s", string(testRecordsStr[i].key), string(testRecordsStr[i].val))
 
 		testRecordsInt[i].key = []byte("/test/onlineconf/int" + stri)
 		testRecordsInt[i].val = []byte(typeByte + stri)
 
-		// log.Printf("key %s val %s", string(testRecordsInt[i].key), string(testRecordsInt[i].val))
-
 	}
-	return testRecordsStr, testRecordsInt
+
+	testRecordsBool := make([]testCDBRecord, 3)
+	testRecordsBool[0].key = []byte(TestOnlineConfTrue)
+	testRecordsBool[0].val = []byte(typeByte + "1")
+	testRecordsBool[1].key = []byte(TestOnlineConfFalse)
+	testRecordsBool[1].val = []byte(typeByte + "0")
+	testRecordsBool[2].key = []byte(TestOnlineConfEmpty)
+	testRecordsBool[2].val = []byte(typeByte + "")
+
+	return testRecordsStr, testRecordsInt, testRecordsBool
 }
 
 func (suite *OCTestSuite) SetupTest() {
@@ -86,13 +97,9 @@ func (suite *OCTestSuite) TearDownTest() {
 	suite.Nilf(err, "Can't remove cdb file: %#v", err)
 }
 
-func fillTestCDB(writer *cdb.Writer, testRecordsStr, testRecordsInt []testCDBRecord) error {
+func fillTestCDB(writer *cdb.Writer, testRecords []testCDBRecord) error {
 
-	allTestRecords := []testCDBRecord{}
-	allTestRecords = append(allTestRecords, testRecordsInt...)
-	allTestRecords = append(allTestRecords, testRecordsStr...)
-	for _, rec := range allTestRecords {
-		// log.Printf("putting: key %s val %s", string(rec.key), string(rec.val))
+	for _, rec := range testRecords {
 		err := writer.Put(rec.key, rec.val)
 		if err != nil {
 			return err
@@ -107,13 +114,19 @@ func fillTestCDB(writer *cdb.Writer, testRecordsStr, testRecordsInt []testCDBRec
 
 func (suite *OCTestSuite) prepareTestData() {
 
-	testRecordsStr, testRecordsInt := generateTestRecords(2)
+	testRecordsStr, testRecordsInt, testRecordsBool := generateTestRecords(2)
 
 	suite.testRecordsStr = testRecordsStr
 	suite.testRecordsInt = testRecordsInt
+	suite.testRecordsBool = testRecordsBool
+
+	allTestRecords := []testCDBRecord{}
+	allTestRecords = append(allTestRecords, testRecordsInt...)
+	allTestRecords = append(allTestRecords, testRecordsStr...)
+	allTestRecords = append(allTestRecords, testRecordsBool...)
 
 	writer := suite.getCDBWriter()
-	err := fillTestCDB(writer, suite.testRecordsStr, suite.testRecordsInt)
+	err := fillTestCDB(writer, allTestRecords)
 	suite.Nil(err)
 	suite.Require().Nilf(err, "Cant put new value to cdb: %#v", err)
 }
@@ -128,11 +141,21 @@ func (suite *OCTestSuite) TestInt() {
 		testInt, err := strconv.Atoi(string(testRec.val[1:]))
 		suite.Require().NoErrorf(err, "Cant parse test record int: %w", err)
 		suite.Equal(ocInt, testInt)
+
+		// cached value expected to be returned
+		ocInt, err = module.Int(intParam)
+		suite.NoErrorf(err, "Cant find key %s in test onlineconf", string(testRec.key))
+		suite.Equal(ocInt, testInt)
 	}
 
 	for i, testRec := range suite.testRecordsInt {
 		intParam := MustConfigParamInt(string(testRec.key)+"_not_exists", i)
 		ocInt, err := module.Int(intParam)
+		suite.True(IsErrKeyNotFound(err), "non existing path: %s", string(testRec.key))
+		suite.Equal(ocInt, i, "Default result was returned")
+
+		// cached value expected to be returned
+		ocInt, err = module.Int(intParam)
 		suite.True(IsErrKeyNotFound(err), "non existing path: %s", string(testRec.key))
 		suite.Equal(ocInt, i, "Default result was returned")
 	}
@@ -146,6 +169,11 @@ func (suite *OCTestSuite) TestString() {
 		ocStr, err := module.String(strPath)
 		suite.NoErrorf(err, "Cant find key %s in test onlineconf", string(testRec.key))
 		suite.Equal(string(testRec.val[1:]), ocStr)
+
+		// cached value expected to be returned
+		ocStr, err = module.String(strPath)
+		suite.NoErrorf(err, "Cant find key %s in test onlineconf", string(testRec.key))
+		suite.Equal(string(testRec.val[1:]), ocStr)
 	}
 
 	for i, testRec := range suite.testRecordsStr {
@@ -154,7 +182,46 @@ func (suite *OCTestSuite) TestString() {
 		ocStr, err := module.String(strParam)
 		suite.True(IsErrKeyNotFound(err), "non existing path: %s", string(testRec.key))
 		suite.Equal(ocStr, defaultParamValue, "Default result was returned")
+
+		// cached value expected to be returned
+		ocStr, err = module.String(strParam)
+		suite.True(IsErrKeyNotFound(err), "non existing path: %s", string(testRec.key))
+		suite.Equal(ocStr, defaultParamValue, "Default result was returned")
 	}
+}
+
+func (suite *OCTestSuite) TestBool() {
+	module := suite.mr.Module()
+
+	// TestOnlineConfTrue
+	trueVal, err := module.Bool(MustConfigParamBool(TestOnlineConfTrue, false))
+	suite.Assert().NoError(err)
+	suite.Assert().True(trueVal)
+
+	// cached value expected to be returned
+	trueVal, err = module.Bool(MustConfigParamBool(TestOnlineConfTrue, false))
+	suite.Assert().NoError(err)
+	suite.Assert().True(trueVal)
+
+	// TestOnlineConfFalse
+	falseVal, err := module.Bool(MustConfigParamBool(TestOnlineConfFalse, true))
+	suite.Assert().NoError(err)
+	suite.Assert().False(falseVal)
+
+	// cached value expected to be returned
+	falseVal, err = module.Bool(MustConfigParamBool(TestOnlineConfTrue, true))
+	suite.Assert().NoError(err)
+	suite.Assert().True(falseVal)
+
+	// TestOnlineConfEmpty
+	falseVal, err = module.Bool(MustConfigParamBool(TestOnlineConfEmpty, true))
+	suite.Assert().NoError(err)
+	suite.Assert().False(falseVal)
+
+	// cached value expected to be returned
+	falseVal, err = module.Bool(MustConfigParamBool(TestOnlineConfEmpty, true))
+	suite.Assert().NoError(err)
+	suite.Assert().False(falseVal)
 }
 
 func (suite *OCTestSuite) TestReload() {
