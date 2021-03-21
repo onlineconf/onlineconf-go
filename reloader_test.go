@@ -126,7 +126,8 @@ func (suite *OCTestSuite) TestReload() {
 			time.Sleep(time.Second)
 		} else {
 			// force reload is inotiify watcher
-			mr.Reload()
+			err = mr.Reload()
+			suite.Require().NoError(err)
 		}
 	}
 

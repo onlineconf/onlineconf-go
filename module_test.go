@@ -17,7 +17,6 @@ type testCDBRecord struct {
 type OCTestSuite struct {
 	suite.Suite
 	cdbFile   *os.File
-	cdbHandle *cdb.CDB
 
 	testRecordsStr  []testCDBRecord
 	testRecordsInt  []testCDBRecord
