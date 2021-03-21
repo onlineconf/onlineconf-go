@@ -101,14 +101,22 @@ func (suite *OCTestSuite) TestReload() {
 	err = os.Chmod(suite.cdbFile.Name(), 0644)
 	suite.Require().NoError(err)
 
-	time.Sleep(time.Second)
+	var newModule *Module
+
+	maxTries := 10
+	for i := 0; i < maxTries; i++ {
+		newModule = suite.mr.Module()
+		if newModule != module {
+			break
+		}
+		suite.Require().Less(i, maxTries-1, "max tries limit reached")
+		time.Sleep(time.Second)
+	}
 
 	// old module instance returns old value
 	val, err = module.String(MustConfigParamString(testPath, ""))
 	suite.Assert().Equal(val, testValue)
 	suite.Assert().NoError(err)
-
-	newModule := suite.mr.Module()
 
 	val, err = newModule.String(MustConfigParamString(testPath, ""))
 	suite.Assert().Equal(newTestValue, val)
