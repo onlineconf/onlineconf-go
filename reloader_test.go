@@ -109,12 +109,12 @@ func (suite *OCTestSuite) TestReload() {
 // Simple reloader with no error handling.
 func ExampleModuleReloader_RunWatcher_simple() {
 	reloader := MustReloader("TREE")
-	go reloader.RunWatcher(context.TODO())
+	go reloader.RunWatcher(context.TODO()) //nolint:errcheck
 
 	oldModule := reloader.Module()
 
 	// let `/test/onlineconf/int0` == 123
-	oldModule.Int(MustConfigParamInt("/test/onlineconf/int0", 0))
+	oldModule.Int(MustConfigParamInt("/test/onlineconf/int0", 0)) //nolint:errcheck
 
 	// time.Sleep(time.Minute)
 
@@ -123,10 +123,10 @@ func ExampleModuleReloader_RunWatcher_simple() {
 	updatedModule := reloader.Module()
 
 	// oldModule value is still 123
-	oldModule.Int(MustConfigParamInt("/test/onlineconf/int0", 0))
+	oldModule.Int(MustConfigParamInt("/test/onlineconf/int0", 0)) //nolint:errcheck
 
 	// updatedModule value is 12345
-	updatedModule.Int(MustConfigParamInt("/test/onlineconf/int0", 0))
+	updatedModule.Int(MustConfigParamInt("/test/onlineconf/int0", 0)) //nolint:errcheck
 }
 
 // More sophisticated way with reload retries, error logging and graceful shutdown.
@@ -153,7 +153,7 @@ func ExampleModuleReloader_RunWatcher_with_retries() {
 
 	module := reloader.Module()
 	// retrieve config params from module
-	module.Int(MustConfigParamInt("/test/onlineconf/int0", 0))
+	module.Int(MustConfigParamInt("/test/onlineconf/int0", 0)) //nolint:errcheck
 
 	// ...
 
