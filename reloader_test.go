@@ -1,13 +1,9 @@
 package onlineconf
 
 import (
-	"context"
-	"fmt"
 	"io/ioutil"
 	"os"
-	"sync"
 	"testing"
-	"time"
 
 	"github.com/colinmarc/cdb"
 	"github.com/stretchr/testify/assert"
@@ -80,24 +76,6 @@ func (suite *OCTestSuite) TestReload() {
 	mr, err := NewModuleReloader(&ReloaderOptions{FilePath: file.Name()})
 	suite.Require().NoError(err)
 
-	ctx := context.Background()
-	ctx, cancel := context.WithCancel(ctx)
-	wg := &sync.WaitGroup{}
-	wg.Add(1)
-
-	go func() {
-		for {
-			err := mr.RunWatcher(ctx)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "onlineconf reloader error: %s", err.Error())
-				continue
-			}
-			break
-		}
-
-		wg.Done()
-	}()
-
 	module := mr.Module()
 	val, err := module.String(MustConfigParamString(testPath, ""))
 	suite.Assert().Equal(val, testValue)
@@ -110,26 +88,9 @@ func (suite *OCTestSuite) TestReload() {
 	err = fillTestCDB(writer, []testCDBRecord{{key: []byte(testPath), val: []byte(typeByte + newTestValue)}})
 	suite.Require().NoError(err)
 
-	err = os.Chmod(file.Name(), 0644)
+	err = mr.Reload()
 	suite.Require().NoError(err)
-
-	var newModule *Module
-
-	maxTries := 20
-	for i := 0; i < maxTries; i++ {
-		newModule = mr.Module()
-		if newModule != module {
-			break
-		}
-		limitNotReached := suite.Assert().Less(i, maxTries-1, "max tries limit reached")
-		if limitNotReached {
-			time.Sleep(time.Second)
-		} else {
-			// force reload is inotiify watcher
-			err = mr.Reload()
-			suite.Require().NoError(err)
-		}
-	}
+	newModule := mr.Module()
 
 	// old module instance returns old value
 	val, err = module.String(MustConfigParamString(testPath, ""))
@@ -139,7 +100,4 @@ func (suite *OCTestSuite) TestReload() {
 	val, err = newModule.String(MustConfigParamString(testPath, ""))
 	suite.Assert().Equal(newTestValue, val)
 	suite.Assert().NoError(err)
-
-	cancel()
-	wg.Wait()
 }
