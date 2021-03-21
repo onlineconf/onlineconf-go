@@ -5,6 +5,7 @@ import (
 	"strings"
 )
 
+// ParamPath validates onlineconf path is valid.
 type ParamPath struct {
 	path string
 }

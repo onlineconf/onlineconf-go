@@ -15,6 +15,7 @@ import (
 var ErrInvalidCDB = errors.New("cdb is inconsistent")
 
 // Module is a structure that associated with onlineconf module file.
+// Performs CDB lookups caching.
 type Module struct {
 	CDB *cdb.CDB
 
@@ -29,7 +30,7 @@ type Module struct {
 	notExistingParams   map[string]struct{}
 }
 
-// NewModule
+// NewModule reads CDB index from reader and returns *Module object.
 func NewModule(reader io.ReaderAt) (*Module, error) {
 
 	cdbReader, err := cdb.New(reader, nil)
@@ -48,18 +49,6 @@ func NewModule(reader io.ReaderAt) (*Module, error) {
 		notExistingParamsMu: sync.RWMutex{},
 		notExistingParams:   make(map[string]struct{}),
 	}
-
-	return module, nil
-}
-
-// NewPredeclaredModule
-func NewPredeclaredModule(reader io.ReaderAt, paramsDescriptsion []ConfigParam) (*Module, error) {
-	module, err := NewModule(reader)
-	if err != nil {
-		return nil, err
-	}
-
-	// todo fill params
 
 	return module, nil
 }

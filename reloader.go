@@ -96,7 +96,7 @@ func MustTree() *Module {
 	return m
 }
 
-// NewModuleReloader creates new module reloader
+// NewModuleReloader creates and reloads new module reloader.
 func NewModuleReloader(ops *ReloaderOptions) (*ModuleReloader, error) {
 	if ops.FilePath == "" {
 		if ops.Dir == "" {
@@ -127,6 +127,17 @@ func (mr *ModuleReloader) Module() *Module {
 	return mod
 }
 
+// RunWatcher runs fsnotify Watcher to reload module after CDB file was
+// updated by onlineconf-updater. Error returned and watcher wwould be closed in case of error.
+//
+// onlineconf-updater makes Chmod on the module cdb file after module was updated
+// to emit inotify event.
+//
+// Watcher is not required for short-running scripts.
+//
+// RunWatcher must be called in separate goroutine.
+//
+//
 func (mr *ModuleReloader) RunWatcher(ctx context.Context) error {
 	var watcher *fsnotify.Watcher
 
@@ -165,6 +176,7 @@ WATCHERLOOP:
 	return watcherLoopErr
 }
 
+// Reload reloads CDB file and creates new Module associated with reloaded CDB file.
 func (mr *ModuleReloader) Reload() error {
 
 	cdbFile, err := mmap.Open(mr.ops.FilePath)

@@ -6,11 +6,12 @@ import (
 	"strconv"
 )
 
-// ErrBrokenCDB returned for empty onlineconf values.
+// ErrBrokenCDB returned for invalid onlineconf parameters.
 // Valid onlineconf module value must contain at least
-// one byte for parameter type e. g. `s` for string params and `j` for JSON params
+// one byte for parameter type e. g. `s` for string params and `j` for JSON params.
 var ErrBrokenCDB = errors.New("cdb record is not valid for onlineconf module")
 
+// ErrKeyNotFound returned for parameter that was not defined in onlineconf module.
 type ErrKeyNotFound struct {
 	path string
 }
@@ -19,6 +20,7 @@ func (err *ErrKeyNotFound) Error() string {
 	return fmt.Sprintf("key `%s` not found in onlineconf", err.path)
 }
 
+// IsErrKeyNotFound checks if error is ErrKeyNotFound
 func IsErrKeyNotFound(err error) bool {
 	_, ok := err.(*ErrKeyNotFound)
 	return ok
@@ -49,6 +51,17 @@ func (m *Module) readBytes(paramPath *ParamPath) ([]byte, error) {
 	return stringData[1:], nil
 }
 
+func (m *Module) readString(paramPath *ParamPath) (string, error) {
+	readBytes, err := m.readBytes(paramPath)
+	if err != nil {
+		return "", err
+	}
+
+	return string(readBytes), nil
+}
+
+// string tries to retrieve config value from cached parameters map.
+// Lookup CDB file in case parameter was not cached and saves it to cache.
 func (m *Module) string(configParam ConfigParam) (string, error) {
 	paramPath := configParam.GetPath()
 	param, ok := m.getStringCached(paramPath)
@@ -76,6 +89,7 @@ func (m *Module) string(configParam ConfigParam) (string, error) {
 }
 
 // String returns value of a named parameter from the module.
+// In case of any error configParam default value returned.
 func (m *Module) String(configParam *ConfigParamString) (string, error) {
 	paramStr, err := m.string(configParam)
 
@@ -86,16 +100,8 @@ func (m *Module) String(configParam *ConfigParamString) (string, error) {
 	return paramStr, nil
 }
 
-func (m *Module) readString(paramPath *ParamPath) (string, error) {
-	readBytes, err := m.readBytes(paramPath)
-	if err != nil {
-		return "", err
-	}
-
-	return string(readBytes), nil
-}
-
 // Int returns value of a named parameter from the module.
+// In case of any error configParam default value returned.
 func (m *Module) Int(configParam *ConfigParamInt) (int, error) {
 	paramPath := configParam.path
 	param, ok := m.getIntCached(paramPath)
@@ -119,6 +125,7 @@ func (m *Module) Int(configParam *ConfigParamInt) (int, error) {
 }
 
 // Bool returns bool interpretation of param.
+// In case of any error configParam default value returned.
 func (m *Module) Bool(configParam *ConfigParamBool) (bool, error) {
 	paramPath := configParam.path
 	param, ok := m.getBoolCached(paramPath)
