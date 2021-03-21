@@ -98,7 +98,8 @@ func (suite *OCTestSuite) TestReload() {
 	writer := suite.getCDBWriter()
 	err = fillTestCDB(writer, suite.testRecordsStr)
 	suite.Require().NoError(err)
-	os.Chmod(suite.cdbFile.Name(), 0644)
+	err = os.Chmod(suite.cdbFile.Name(), 0644)
+	suite.Require().NoError(err)
 
 	time.Sleep(time.Second)
 
