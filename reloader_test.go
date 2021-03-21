@@ -63,6 +63,22 @@ func BenchmarkModuleReload(t *testing.B) {
 }
 
 func (suite *OCTestSuite) TestReload() {
+	file, err := ioutil.TempFile("", "test_reloader_*.cdb")
+	suite.Require().Nilf(err, "Can't open temporary file: %#v", err)
+
+	// generate test data
+	typeByte := "s"
+	testPath := "/test/onlineconf/reloader_test"
+	testValue := "original_value"
+
+	writer, err := cdb.Create(file.Name())
+	suite.Require().NoError(err, "Can't get CDB writer: %#v", err)
+	err = fillTestCDB(writer, []testCDBRecord{{key: []byte(testPath), val: []byte(typeByte + testValue)}})
+	suite.Require().NoError(err)
+
+	// create reloader
+	mr, err := NewModuleReloader(&ReloaderOptions{FilePath: file.Name()})
+	suite.Require().NoError(err)
 
 	ctx := context.Background()
 	ctx, cancel := context.WithCancel(ctx)
@@ -71,7 +87,7 @@ func (suite *OCTestSuite) TestReload() {
 
 	go func() {
 		for {
-			err := suite.mr.RunWatcher(ctx)
+			err := mr.RunWatcher(ctx)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "onlineconf reloader error: %s", err.Error())
 				continue
@@ -82,35 +98,36 @@ func (suite *OCTestSuite) TestReload() {
 		wg.Done()
 	}()
 
-	testPath := string(suite.testRecordsStr[0].key)
-	testValue := string(suite.testRecordsStr[0].val[1:])
-
-	module := suite.mr.Module()
+	module := mr.Module()
 	val, err := module.String(MustConfigParamString(testPath, ""))
 	suite.Assert().Equal(val, testValue)
 	suite.Assert().NoError(err)
 
-	typeByte := "s"
-	newTestValue := "updated_ccb_value"
-	suite.testRecordsStr[0].val = []byte(typeByte + newTestValue)
-
 	// rewrite cdb data with updated key
-	writer := suite.getCDBWriter()
-	err = fillTestCDB(writer, suite.testRecordsStr)
+	newTestValue := "updated_cdb_value"
+	writer, err = cdb.Create(file.Name())
+	suite.Require().Nilf(err, "Can't get CDB writer: %#v", err)
+	err = fillTestCDB(writer, []testCDBRecord{{key: []byte(testPath), val: []byte(typeByte + newTestValue)}})
 	suite.Require().NoError(err)
-	err = os.Chmod(suite.cdbFile.Name(), 0644)
+
+	err = os.Chmod(file.Name(), 0644)
 	suite.Require().NoError(err)
 
 	var newModule *Module
 
-	maxTries := 10
+	maxTries := 20
 	for i := 0; i < maxTries; i++ {
-		newModule = suite.mr.Module()
+		newModule = mr.Module()
 		if newModule != module {
 			break
 		}
-		suite.Require().Less(i, maxTries-1, "max tries limit reached")
-		time.Sleep(time.Second)
+		limitNotReached := suite.Assert().Less(i, maxTries-1, "max tries limit reached")
+		if limitNotReached {
+			time.Sleep(time.Second)
+		} else {
+			// force reload is inotiify watcher
+			mr.Reload()
+		}
 	}
 
 	// old module instance returns old value

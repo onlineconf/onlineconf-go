@@ -30,13 +30,9 @@ func TestOCTestSuite(t *testing.T) {
 	suite.Run(t, new(OCTestSuite))
 }
 
-func (suite *OCTestSuite) getCDBReader() *cdb.CDB {
-	return suite.cdbHandle
-}
-
-func (suite *OCTestSuite) getCDBWriter() *cdb.Writer {
+func (suite *OCTestSuite) getCDBWriter(file *os.File) *cdb.Writer {
 	// initialize writer
-	writer, err := cdb.Create(suite.cdbFile.Name())
+	writer, err := cdb.Create(file.Name())
 	suite.Require().Nilf(err, "Can't get CDB writer: %#v", err)
 	return writer
 }
@@ -77,10 +73,7 @@ func (suite *OCTestSuite) SetupTest() {
 	f, err := ioutil.TempFile("", "test_*.cdb")
 	suite.Require().Nilf(err, "Can't open temporary file: %#v", err)
 
-	suite.T().Logf("setd cdb: %s\n", f.Name())
-
 	suite.cdbFile = f
-	suite.cdbHandle = suite.getCDBReader()
 
 	suite.prepareTestData()
 
@@ -125,10 +118,9 @@ func (suite *OCTestSuite) prepareTestData() {
 	allTestRecords = append(allTestRecords, testRecordsStr...)
 	allTestRecords = append(allTestRecords, testRecordsBool...)
 
-	writer := suite.getCDBWriter()
+	writer := suite.getCDBWriter(suite.cdbFile)
 	err := fillTestCDB(writer, allTestRecords)
-	suite.Nil(err)
-	suite.Require().Nilf(err, "Cant put new value to cdb: %#v", err)
+	suite.Require().NoError(err, "Cant put new value to cdb: %#v", err)
 }
 
 func (suite *OCTestSuite) TestInt() {
