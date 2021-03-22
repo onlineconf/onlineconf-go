@@ -9,6 +9,7 @@ import (
 
 	"github.com/colinmarc/cdb"
 	"github.com/stretchr/testify/suite"
+	"golang.org/x/exp/mmap"
 )
 
 type testCDBRecord struct {
@@ -242,12 +243,12 @@ func BenchmarkMmappedCdb(t *testing.B) {
 	testVal := "test_val"
 	fillTestCDB(scdWriter, []testCDBRecord{{key: []byte(testKey), val: []byte(testVal)}})
 
-	f, err = os.Open(f.Name())
+	cdbFile, err := mmap.Open(f.Name())
 	if err != nil {
 		panic(err)
 	}
 
-	cdbReader, err := cdb.New(f, nil)
+	cdbReader, err := cdb.New(cdbFile, nil)
 	if err != nil {
 		panic(err)
 	}
