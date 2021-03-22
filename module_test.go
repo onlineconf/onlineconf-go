@@ -1,6 +1,7 @@
 package onlineconf
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"strconv"
@@ -16,7 +17,7 @@ type testCDBRecord struct {
 }
 type OCTestSuite struct {
 	suite.Suite
-	cdbFile   *os.File
+	cdbFile *os.File
 
 	testRecordsStr  []testCDBRecord
 	testRecordsInt  []testCDBRecord
@@ -221,4 +222,77 @@ func (suite *OCTestSuite) TestJSON() {
 
 func (suite *OCTestSuite) TestConcurrent() {
 	// todo
+}
+
+func BenchmarkMmappedCdb(t *testing.B) {
+	f, err := ioutil.TempFile("", "bench_*.cdb")
+	if err != nil {
+		panic(err)
+	}
+	f.Close()
+
+	defer os.Remove(f.Name())
+
+	scdWriter, err := cdb.Create(f.Name())
+	if err != nil {
+		panic(err)
+	}
+
+	testKey := "test_key"
+	testVal := "test_val"
+	fillTestCDB(scdWriter, []testCDBRecord{{key: []byte(testKey), val: []byte(testVal)}})
+
+	f, err = os.Open(f.Name())
+	if err != nil {
+		panic(err)
+	}
+
+	cdbReader, err := cdb.New(f, nil)
+	if err != nil {
+		panic(err)
+	}
+
+	var gotString string
+
+	t.ResetTimer()
+
+	for i := 0; i < t.N; i++ {
+		gotGytes, err := cdbReader.Get([]byte(testKey))
+		if err != nil {
+			panic(err)
+		}
+		gotString = string(gotGytes)
+		if gotString != testVal {
+			panic("cdb returned invalid string")
+		}
+	}
+
+	_ = gotString
+
+	t.StopTimer()
+}
+
+func BenchmarkGoMap(t *testing.B) {
+
+	testKey := "test_key"
+	testVal := "test_val"
+
+	goMap := make(map[string]string)
+
+	goMap[testKey] = testVal
+
+	var gotString string
+
+	t.ResetTimer()
+
+	for i := 0; i < t.N; i++ {
+		mapString, _ := goMap[testKey]
+		if testVal != mapString {
+			panic(fmt.Sprintf("map returned invalid val: %s %s", testVal, mapString))
+		}
+	}
+
+	_ = gotString
+
+	t.StopTimer()
 }
