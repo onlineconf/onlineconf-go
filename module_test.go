@@ -227,7 +227,10 @@ func BenchmarkMmappedCdb(t *testing.B) {
 
 	testKey := "test_key"
 	testVal := "test_val"
-	fillTestCDB(scdWriter, []testCDBRecord{{key: []byte(testKey), val: []byte(testVal)}})
+	err = fillTestCDB(scdWriter, []testCDBRecord{{key: []byte(testKey), val: []byte(testVal)}})
+	if err != nil {
+		panic(err)
+	}
 
 	cdbFile, err := mmap.Open(f.Name())
 	if err != nil {
@@ -273,7 +276,7 @@ func BenchmarkGoMap(t *testing.B) {
 	t.ResetTimer()
 
 	for i := 0; i < t.N; i++ {
-		mapString, _ := goMap[testKey]
+		mapString := goMap[testKey]
 		if testVal != mapString {
 			panic(fmt.Sprintf("map returned invalid val: %s %s", testVal, mapString))
 		}
