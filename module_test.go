@@ -129,27 +129,23 @@ func (suite *OCTestSuite) TestInt() {
 
 	for _, testRec := range suite.testRecordsInt {
 		intParam := MustConfigParamInt(string(testRec.key), 0)
-		ocInt, err := module.Int(intParam)
-		suite.NoErrorf(err, "Cant find key %s in test onlineconf", string(testRec.key))
+		ocInt := module.Int(intParam)
 		testInt, err := strconv.Atoi(string(testRec.val[1:]))
 		suite.Require().NoErrorf(err, "Cant parse test record int: %w", err)
 		suite.Equal(ocInt, testInt)
 
 		// cached value expected to be returned
-		ocInt, err = module.Int(intParam)
-		suite.NoErrorf(err, "Cant find key %s in test onlineconf", string(testRec.key))
+		ocInt = module.Int(intParam)
 		suite.Equal(ocInt, testInt)
 	}
 
 	for i, testRec := range suite.testRecordsInt {
 		intParam := MustConfigParamInt(string(testRec.key)+"_not_exists", i)
-		ocInt, err := module.Int(intParam)
-		suite.True(IsErrKeyNotFound(err), "non existing path: %s", string(testRec.key))
+		ocInt := module.Int(intParam)
 		suite.Equal(ocInt, i, "Default result was returned")
 
 		// cached value expected to be returned
-		ocInt, err = module.Int(intParam)
-		suite.True(IsErrKeyNotFound(err), "non existing path: %s", string(testRec.key))
+		ocInt = module.Int(intParam)
 		suite.Equal(ocInt, i, "Default result was returned")
 	}
 }
@@ -159,26 +155,22 @@ func (suite *OCTestSuite) TestString() {
 
 	for _, testRec := range suite.testRecordsStr {
 		strPath := MustConfigParamString(string(testRec.key), "")
-		ocStr, err := module.String(strPath)
-		suite.NoErrorf(err, "Cant find key %s in test onlineconf", string(testRec.key))
+		ocStr := module.String(strPath)
 		suite.Equal(string(testRec.val[1:]), ocStr)
 
 		// cached value expected to be returned
-		ocStr, err = module.String(strPath)
-		suite.NoErrorf(err, "Cant find key %s in test onlineconf", string(testRec.key))
+		ocStr = module.String(strPath)
 		suite.Equal(string(testRec.val[1:]), ocStr)
 	}
 
 	for i, testRec := range suite.testRecordsStr {
 		defaultParamValue := "test_not_exists_" + strconv.Itoa(i)
 		strParam := MustConfigParamString(string(testRec.key)+"_not_exists", defaultParamValue)
-		ocStr, err := module.String(strParam)
-		suite.True(IsErrKeyNotFound(err), "non existing path: %s", string(testRec.key))
+		ocStr := module.String(strParam)
 		suite.Equal(ocStr, defaultParamValue, "Default result was returned")
 
 		// cached value expected to be returned
-		ocStr, err = module.String(strParam)
-		suite.True(IsErrKeyNotFound(err), "non existing path: %s", string(testRec.key))
+		ocStr = module.String(strParam)
 		suite.Equal(ocStr, defaultParamValue, "Default result was returned")
 	}
 }
@@ -187,33 +179,27 @@ func (suite *OCTestSuite) TestBool() {
 	module := suite.mr.Module()
 
 	// TestOnlineConfTrue
-	trueVal, err := module.Bool(MustConfigParamBool(TestOnlineConfTrue, false))
-	suite.Assert().NoError(err)
+	trueVal := module.Bool(MustConfigParamBool(TestOnlineConfTrue, false))
 	suite.Assert().True(trueVal)
 
 	// cached value expected to be returned
-	trueVal, err = module.Bool(MustConfigParamBool(TestOnlineConfTrue, false))
-	suite.Assert().NoError(err)
+	trueVal = module.Bool(MustConfigParamBool(TestOnlineConfTrue, false))
 	suite.Assert().True(trueVal)
 
 	// TestOnlineConfFalse
-	falseVal, err := module.Bool(MustConfigParamBool(TestOnlineConfFalse, true))
-	suite.Assert().NoError(err)
+	falseVal := module.Bool(MustConfigParamBool(TestOnlineConfFalse, true))
 	suite.Assert().False(falseVal)
 
 	// cached value expected to be returned
-	falseVal, err = module.Bool(MustConfigParamBool(TestOnlineConfTrue, true))
-	suite.Assert().NoError(err)
+	falseVal = module.Bool(MustConfigParamBool(TestOnlineConfTrue, true))
 	suite.Assert().True(falseVal)
 
 	// TestOnlineConfEmpty
-	falseVal, err = module.Bool(MustConfigParamBool(TestOnlineConfEmpty, true))
-	suite.Assert().NoError(err)
+	falseVal = module.Bool(MustConfigParamBool(TestOnlineConfEmpty, true))
 	suite.Assert().False(falseVal)
 
 	// cached value expected to be returned
-	falseVal, err = module.Bool(MustConfigParamBool(TestOnlineConfEmpty, true))
-	suite.Assert().NoError(err)
+	falseVal = module.Bool(MustConfigParamBool(TestOnlineConfEmpty, true))
 	suite.Assert().False(falseVal)
 }
 

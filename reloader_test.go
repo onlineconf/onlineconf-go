@@ -81,9 +81,8 @@ func (suite *OCTestSuite) TestReload() {
 	suite.Require().NoError(err)
 
 	module := mr.Module()
-	val, err := module.String(MustConfigParamString(testPath, ""))
+	val := module.String(MustConfigParamString(testPath, ""))
 	suite.Assert().Equal(val, testValue)
-	suite.Assert().NoError(err)
 
 	// rewrite cdb data with updated key
 	newTestValue := "updated_cdb_value"
@@ -97,13 +96,11 @@ func (suite *OCTestSuite) TestReload() {
 	newModule := mr.Module()
 
 	// old module instance returns old value
-	val, err = module.String(MustConfigParamString(testPath, ""))
+	val = module.String(MustConfigParamString(testPath, ""))
 	suite.Assert().Equal(val, testValue)
-	suite.Assert().NoError(err)
 
-	val, err = newModule.String(MustConfigParamString(testPath, ""))
+	val = newModule.String(MustConfigParamString(testPath, ""))
 	suite.Assert().Equal(newTestValue, val)
-	suite.Assert().NoError(err)
 }
 
 // Simple reloader with no error handling.

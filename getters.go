@@ -32,16 +32,17 @@ func newErrKeyNotFound(path string) *ErrKeyNotFound {
 	}
 }
 
-func (m *Module) readBytes(paramPath *ParamPath) ([]byte, error) {
+// ReadBytes returns raw bytes that was read ftom CDB file. No caching. Error returned if any.
+func (m *Module) ReadBytes(paramPath *ParamPath) ([]byte, error) {
 	path := paramPath.path
 	stringData, err := m.CDB.Get([]byte(path))
 
-	if stringData == nil && err == nil {
-		return nil, newErrKeyNotFound(path)
-	}
-
 	if err != nil {
 		return nil, fmt.Errorf("onlineconf module readSregin: %w", err)
+	}
+
+	if stringData == nil && err == nil {
+		return nil, newErrKeyNotFound(path)
 	}
 
 	if len(stringData) < 1 {
@@ -52,7 +53,7 @@ func (m *Module) readBytes(paramPath *ParamPath) ([]byte, error) {
 }
 
 func (m *Module) readString(paramPath *ParamPath) (string, error) {
-	readBytes, err := m.readBytes(paramPath)
+	readBytes, err := m.ReadBytes(paramPath)
 	if err != nil {
 		return "", err
 	}
@@ -89,57 +90,60 @@ func (m *Module) string(configParam ConfigParam) (string, error) {
 }
 
 // String returns value of a named parameter from the module.
-// In case of any error configParam default value returned.
-func (m *Module) String(configParam *ConfigParamString) (string, error) {
+// Module getters returns no error due to reading from mmapeed file will never return error.
+// In case of reading error on mmapped file SIGSEGV will be sent to the process.
+func (m *Module) String(configParam *ConfigParamString) string {
 	paramStr, err := m.string(configParam)
 
 	if err != nil {
-		return configParam.defaultValue, err
+		return configParam.defaultValue
 	}
 
-	return paramStr, nil
+	return paramStr
 }
 
 // Int returns value of a named parameter from the module.
-// In case of any error configParam default value returned.
-func (m *Module) Int(configParam *ConfigParamInt) (int, error) {
+// Module getters returns no error due to reading from mmapeed file will never return error.
+// In case of reading error on mmapped file SIGSEGV will be sent to the process.
+func (m *Module) Int(configParam *ConfigParamInt) int {
 	paramPath := configParam.path
 	param, ok := m.getIntCached(paramPath)
 	if ok {
-		return param, nil
+		return param
 	}
 
 	paramStr, err := m.string(configParam)
 	if err != nil {
-		return configParam.defaultValue, err
+		return configParam.defaultValue
 	}
 
 	paramInt, err := strconv.Atoi(paramStr)
 	if err != nil {
-		return configParam.defaultValue, err
+		return configParam.defaultValue
 	}
 
 	m.setIntCached(paramPath, paramInt)
 
-	return paramInt, nil
+	return paramInt
 }
 
 // Bool returns bool interpretation of param.
-// In case of any error configParam default value returned.
-func (m *Module) Bool(configParam *ConfigParamBool) (bool, error) {
+// Module getters returns no error due to reading from mmapeed file will never return error.
+// In case of reading error on mmapped file SIGSEGV will be sent to the process.
+func (m *Module) Bool(configParam *ConfigParamBool) bool {
 	paramPath := configParam.path
 	param, ok := m.getBoolCached(paramPath)
 	if ok {
-		return param, nil
+		return param
 	}
 
 	paramStr, err := m.string(configParam)
 	if err != nil {
-		return configParam.defaultValue, err
+		return configParam.defaultValue
 	}
 
 	paramBool := len(paramStr) != 0 && paramStr != "0"
 	m.setBoolCached(paramPath, paramBool)
 
-	return paramBool, nil
+	return paramBool
 }

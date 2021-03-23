@@ -43,10 +43,7 @@ func main() {
 		paramPath := flag.CommandLine.Arg(0)
 
 		if *asBool {
-			value, err := module.Bool(onlineconf.MustConfigParamBool(paramPath, false))
-			if err != nil {
-				panic(err)
-			}
+			value := module.Bool(onlineconf.MustConfigParamBool(paramPath, false))
 
 			if value {
 				os.Exit(0)
@@ -105,14 +102,7 @@ func readOCPath(module *onlineconf.Module, path string) {
 		return
 	}
 
-	value, err := module.String(paramPath)
-	if onlineconf.IsErrKeyNotFound(err) {
-		fmt.Println("No such key: ", path)
-		return
-	}
-	if err != nil {
-		panic(err)
-	}
+	value := module.String(paramPath)
 
 	fmt.Println(value)
 }
