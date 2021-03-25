@@ -1,0 +1,4 @@
+cpu.out
+mem.out
+onlineconf-go.test
+coverage*
