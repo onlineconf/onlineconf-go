@@ -8,20 +8,59 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"path"
 	"strconv"
 	"sync"
 
+	"github.com/colinmarc/cdb"
 	"github.com/fsnotify/fsnotify"
-	"github.com/jbarham/go-cdb"
+	"github.com/my-mail-ru/exp/mmap"
 )
 
-const configDir = "/usr/local/etc/onlineconf"
+var configDir = "/usr/local/etc/onlineconf"
 
+var watcherLock sync.Mutex
 var watcher *fsnotify.Watcher
 
 func init() {
 	modules.byName = make(map[string]*Module)
 	modules.byFile = make(map[string]*Module)
+}
+
+// SetOutput sets the output destination for the standard logger.
+func SetOutput(w io.Writer) {
+	log.SetOutput(w)
+}
+
+type Module struct {
+	mutex       sync.RWMutex
+	name        string
+	filename    string
+	mmappedFile *mmap.ReaderAt
+	cdb         *cdb.CDB
+}
+
+func newModule(name string) *Module {
+	filename := path.Join(configDir, name+".cdb")
+
+	ocModule := &Module{name: name, filename: filename}
+	err := ocModule.reopen()
+	if err != nil {
+		panic(err)
+	}
+
+	initWatcher()
+
+	return ocModule
+}
+
+func initWatcher() {
+	watcherLock.Lock()
+	defer watcherLock.Unlock()
+
+	if watcher != nil {
+		return
+	}
 
 	var err error
 	watcher, err = fsnotify.NewWatcher()
@@ -57,47 +96,40 @@ func init() {
 	}()
 }
 
-// SetOutput sets the output destination for the standard logger.
-func SetOutput(w io.Writer) {
-	log.SetOutput(w)
-}
+func (m *Module) reopen() error {
+	log.Printf("Reopen %s\n", m.filename)
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
-type Module struct {
-	m    sync.RWMutex
-	name string
-	file string
-	cdb  *cdb.Cdb
-}
+	oldMmappedFile := m.mmappedFile
 
-func newModule(name string) *Module {
-	file := fmt.Sprintf("%s/%s.cdb", configDir, name)
-	cdb, err := cdb.Open(file)
+	mmappedFile, err := mmap.Open(m.filename)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("mmap Open module: %w", err)
 	}
-	return &Module{name: name, file: file, cdb: cdb}
-}
 
-func (m *Module) reopen() {
-	log.Printf("Reopen %s\n", m.file)
-	m.m.Lock()
-	defer m.m.Unlock()
-	cdb, err := cdb.Open(m.file)
+	cdb, err := cdb.New(mmappedFile, nil)
 	if err != nil {
-		log.Printf("Reopen file %v error: %v\n", m.file, err)
-	} else {
-		m.cdb.Close()
-		m.cdb = cdb
+		mmappedFile.Close()
+		return err
 	}
+
+	m.cdb = cdb
+
+	if oldMmappedFile != nil {
+		oldMmappedFile.Close()
+	}
+
+	return nil
 }
 
 func (m *Module) get(path string) (byte, []byte) {
-	m.m.Lock()
-	defer m.m.Unlock()
-	data, err := m.cdb.Data([]byte(path))
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	data, err := m.cdb.Get([]byte(path))
 	if err != nil || len(data) == 0 {
-		if err != io.EOF {
-			log.Printf("Get %v:%v error: %v", m.file, path, err)
+		if err != nil {
+			log.Printf("Get %v:%v error: %v", m.filename, path, err)
 		}
 		return 0, data
 	}
@@ -138,6 +170,22 @@ func (m *Module) GetIntIfExists(path string) (int, bool) {
 	return i, true
 }
 
+// GetBoolIfExists reads an integer value of a named parameter from the module.
+// It returns this value and the boolean true if the parameter exists and is an bool.
+// In the other case it returns the boolean false and 0.
+func (m *Module) GetBoolIfExists(path string) (bool, bool) {
+	str, ok := m.GetStringIfExists(path)
+	if !ok {
+		return false, false
+	}
+
+	if len(str) == 0 || str == "0" {
+		return false, true
+	}
+
+	return true, true
+}
+
 // GetString reads a string value of a named parameter from the module.
 // It returns this value if the parameter exists and is a string.
 // In the other case it panics unless default value is provided in
@@ -166,6 +214,20 @@ func (m *Module) GetInt(path string, d ...int) int {
 	}
 }
 
+// GetBool reads an bool value of a named parameter from the module.
+// It returns this value if the parameter exists and is a bool.
+// In the other case it panics unless default value is provided in
+// the second argument.
+func (m *Module) GetBool(path string, d ...bool) bool {
+	if val, ok := m.GetBoolIfExists(path); ok {
+		return val
+	} else if len(d) > 0 {
+		return d[0]
+	} else {
+		panic(fmt.Sprintf("%s:%s key not exists and default not found", m.name, path))
+	}
+}
+
 var modules struct {
 	sync.Mutex
 	byName map[string]*Module
@@ -173,7 +235,6 @@ var modules struct {
 }
 
 // GetModule returns a named module.
-// It panics if module not exists.
 func GetModule(name string) *Module {
 	modules.Lock()
 	defer modules.Unlock()
@@ -185,9 +246,21 @@ func GetModule(name string) *Module {
 	module := newModule(name)
 
 	modules.byName[module.name] = module
-	modules.byFile[module.file] = module
+	modules.byFile[module.filename] = module
 
 	return module
+}
+
+// Initialize sets config directory for onlineconf modules.
+// Default value is "/usr/local/etc/onlineconf"
+func Initialize(newConfigDir string) {
+	watcherLock.Lock()
+	defer watcherLock.Unlock()
+	if watcher != nil {
+		panic("Initialize must be called before any onlineconf module was created")
+	}
+
+	configDir = newConfigDir
 }
 
 var tree struct {
@@ -225,6 +298,13 @@ func GetIntIfExists(path string) (int, bool) {
 	return getTree().GetIntIfExists(path)
 }
 
+// GetBoolIfExists reads an bool value of a named parameter from the module "TREE".
+// It returns this value and the boolean true if the parameter exists and is a bool.
+// In the other case it returns the boolean false and 0.
+func GetBoolIfExists(path string) (bool, bool) {
+	return getTree().GetBoolIfExists(path)
+}
+
 // GetString reads a string value of a named parameter from the module "TREE".
 // It returns this value if the parameter exists and is a string.
 // In the other case it panics unless default value is provided in
@@ -239,4 +319,12 @@ func GetString(path string, d ...string) string {
 // the second argument.
 func GetInt(path string, d ...int) int {
 	return getTree().GetInt(path, d...)
+}
+
+// GetBool reads an bool value of a named parameter from the module "TREE".
+// It returns this value if the parameter exists and is a bool.
+// In the other case it panics unless default value is provided in
+// the second argument.
+func GetBool(path string, d ...bool) bool {
+	return getTree().GetBool(path, d...)
 }
