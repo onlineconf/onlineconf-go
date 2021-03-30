@@ -14,7 +14,7 @@ import (
 
 	"github.com/colinmarc/cdb"
 	"github.com/fsnotify/fsnotify"
-	"golang.org/x/exp/mmap"
+	"github.com/my-mail-ru/exp/mmap"
 )
 
 var configDir = "/usr/local/etc/onlineconf"
