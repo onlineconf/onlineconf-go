@@ -215,7 +215,7 @@ func (m *Module) GetInt(path string, d ...int) int {
 }
 
 // GetBool reads an bool value of a named parameter from the module.
-// It returns this value if the parameter exists and is an bool.
+// It returns this value if the parameter exists and is a bool.
 // In the other case it panics unless default value is provided in
 // the second argument.
 func (m *Module) GetBool(path string, d ...bool) bool {
@@ -299,7 +299,7 @@ func GetIntIfExists(path string) (int, bool) {
 }
 
 // GetBoolIfExists reads an bool value of a named parameter from the module "TREE".
-// It returns this value and the boolean true if the parameter exists and is an integer.
+// It returns this value and the boolean true if the parameter exists and is a bool.
 // In the other case it returns the boolean false and 0.
 func GetBoolIfExists(path string) (bool, bool) {
 	return getTree().GetBoolIfExists(path)
@@ -314,7 +314,7 @@ func GetString(path string, d ...string) string {
 }
 
 // GetInt reads an integer value of a named parameter from the module "TREE".
-// It returns this value if the parameter exists and is an bool.
+// It returns this value if the parameter exists and is an integer.
 // In the other case it panics unless default value is provided in
 // the second argument.
 func GetInt(path string, d ...int) int {
@@ -322,7 +322,7 @@ func GetInt(path string, d ...int) int {
 }
 
 // GetBool reads an bool value of a named parameter from the module "TREE".
-// It returns this value if the parameter exists and is an bool.
+// It returns this value if the parameter exists and is a bool.
 // In the other case it panics unless default value is provided in
 // the second argument.
 func GetBool(path string, d ...bool) bool {
