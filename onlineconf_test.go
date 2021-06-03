@@ -24,6 +24,8 @@ type testRecords struct {
 	stringRecords []testCDBRecord
 	intRecords    []testCDBRecord
 	structRecords []testCDBRecord
+	partialStruct testCDBRecord
+	invalidStruct testCDBRecord
 }
 
 type OCTestSuite struct {
@@ -82,6 +84,16 @@ func generateTestRecords(count int) testRecords {
 		testRecords.structRecords[i].key = []byte("/test/onlineconf/struct" + stri)
 		testRecords.structRecords[i].val = append([]byte{'j'}, value...)
 	}
+
+	testRecords.partialStruct = testCDBRecord{
+		key: []byte("/test/onlineconf/partial-struct"),
+		val: []byte(`j{"key1":"value1", "key2":"value2"}`),
+	}
+	testRecords.invalidStruct = testCDBRecord{
+		key: []byte("/test/onlineconf/invalid-struct"),
+		val: []byte(`j{"key1":"value1", "key2":[]}`),
+	}
+
 	return testRecords
 }
 
@@ -106,6 +118,8 @@ func fillTestCDB(writer *cdb.Writer, testRecords testRecords) error {
 	allTestRecords = append(allTestRecords, testRecords.stringRecords...)
 	allTestRecords = append(allTestRecords, testRecords.intRecords...)
 	allTestRecords = append(allTestRecords, testRecords.structRecords...)
+	allTestRecords = append(allTestRecords, testRecords.partialStruct)
+	allTestRecords = append(allTestRecords, testRecords.invalidStruct)
 	for _, rec := range allTestRecords {
 		// log.Printf("putting: key %s val %s", string(rec.key), string(rec.val))
 		err := writer.Put(rec.key, rec.val)
@@ -226,6 +240,18 @@ func (suite *OCTestSuite) TestStruct() {
 	var v1 testStruct
 	module.GetStruct(string(suite.testRecords.structRecords[0].key), &v1)
 	suite.NotEqual("xxx", v1.Key0, "Cached value should not be bound to value returned from the first call")
+
+	orig := testStruct{Key0: "default0", Key1: "default1", Key2: "default2"}
+	{
+		val := orig
+		module.GetStruct(string(suite.testRecords.partialStruct.key), &val)
+		suite.Equal(testStruct{Key1: "value1", Key2: "value2"}, val, "Value must not be merged with default")
+	}
+	{
+		val := orig
+		module.GetStruct(string(suite.testRecords.invalidStruct.key), &val)
+		suite.Equal(orig, val, "Default value must not be touched on error")
+	}
 }
 
 func (suite *OCTestSuite) TestReload() {

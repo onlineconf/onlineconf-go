@@ -263,11 +263,13 @@ func (m *Module) GetStruct(path string, value interface{}) bool {
 	case 0:
 		return false
 	case 'j':
-		err := json.Unmarshal(data, value)
+		val := reflect.New(rv.Type())
+		err := json.Unmarshal(data, val.Interface())
 		if err != nil {
 			log.Printf("%s:%s: failed to unmarshal JSON: %s", m.name, path, err)
 			return false
 		}
+		rv.Set(val.Elem())
 		m.setCache(path, rv)
 		return true
 	default:
