@@ -6,6 +6,7 @@ package onlineconf
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -18,6 +19,8 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/my-mail-ru/exp/mmap"
 )
+
+var ErrFormatIsNotJSON = errors.New("format is not JSON")
 
 var configDir = "/usr/local/etc/onlineconf"
 
@@ -239,7 +242,14 @@ func (m *Module) GetBool(path string, d ...bool) bool {
 // GetStruct reads a structured value of a named parameter from the module.
 // It stores this value in the value pointed by the value argument
 // and returns true if the parameter exists and was unmarshaled successfully.
-func (m *Module) GetStruct(path string, value interface{}) bool {
+// In the case of error or if the parameter is not exists, the method doesn't
+// touch the value argument, so you can safely pass a default value as the value
+// argument and completely ignore return values of this method.
+// A value is unmarshaled from JSON using json.Unmarshal and is cached internally
+// until the configuration is updated, so be careful to not modify values returned by
+// a reference.
+// Experimental: this method can be modified or removed without any notice.
+func (m *Module) GetStruct(path string, value interface{}) (bool, error) {
 	rv := reflect.ValueOf(value)
 	if rv.Kind() != reflect.Ptr {
 		if rv.IsValid() {
@@ -247,34 +257,35 @@ func (m *Module) GetStruct(path string, value interface{}) bool {
 		} else {
 			log.Printf("%s: GetStruct(%q, nil): invalid argument", m.name, path)
 		}
-		return false
+		return false, &json.InvalidUnmarshalError{Type: reflect.TypeOf(value)}
 	} else if rv.IsNil() {
 		log.Printf("%s: GetStruct(%q, nil %s): invalid argument", m.name, path, rv.Type())
-		return false
+		return false, &json.InvalidUnmarshalError{Type: reflect.TypeOf(value)}
 	}
 	rv = rv.Elem()
 
 	if m.getCache(path, rv) {
-		return true
+		return true, nil
 	}
 
 	format, data := m.get(path)
 	switch format {
 	case 0:
-		return false
+		return false, nil
 	case 'j':
 		val := reflect.New(rv.Type())
 		err := json.Unmarshal(data, val.Interface())
 		if err != nil {
 			log.Printf("%s:%s: failed to unmarshal JSON: %s", m.name, path, err)
-			return false
+			return false, err
 		}
 		rv.Set(val.Elem())
 		m.setCache(path, rv)
-		return true
+		return true, nil
 	default:
-		log.Printf("%s:%s: format is not JSON\n", m.name, path)
-		return false
+		err := ErrFormatIsNotJSON
+		log.Printf("%s:%s: %s\n", m.name, path, err)
+		return false, err
 	}
 }
 
@@ -408,6 +419,13 @@ func GetBool(path string, d ...bool) bool {
 // GetStruct reads a structured value of a named parameter from the module "TREE".
 // It stores this value in the value pointed by the value argument
 // and returns true if the parameter exists and was unmarshaled successfully.
-func GetStruct(path string, value interface{}) bool {
+// In the case of error or if the parameter is not exists, the function doesn't
+// touch the value argument, so you can safely pass a default value as the value
+// argument and completely ignore return values of this function.
+// A value is unmarshaled from JSON using json.Unmarshal and is cached internally
+// until the configuration is updated, so be careful to not modify values returned by
+// a reference.
+// Experimental: this function can be modified or removed without any notice.
+func GetStruct(path string, value interface{}) (bool, error) {
 	return getTree().GetStruct(path, value)
 }

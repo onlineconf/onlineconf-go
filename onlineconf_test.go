@@ -204,20 +204,23 @@ func (suite *OCTestSuite) TestStruct() {
 			var refValue map[string]string
 			json.Unmarshal(testRec.val[1:], &refValue)
 			var mapValue map[string]string
-			ok := module.GetStruct(string(testRec.key), &mapValue)
+			ok, err := module.GetStruct(string(testRec.key), &mapValue)
 			suite.True(ok, "Cant find key %s in test onlineconf", string(testRec.key))
+			suite.Nil(err, "Error is not nil")
 			suite.Equal(refValue, mapValue)
 			var structValue testStruct
-			ok = module.GetStruct(string(testRec.key), &structValue)
+			ok, err = module.GetStruct(string(testRec.key), &structValue)
 			suite.True(ok, "Cant find key %s in test onlineconf", string(testRec.key))
+			suite.Nil(err, "Error is not nil")
 			suite.Equal(testStruct{refValue["key0"], refValue["key1"], refValue["key2"]}, structValue)
 		}
 	}
 
 	for _, testRec := range suite.testRecords.structRecords {
 		var value map[string]string
-		ok := module.GetStruct(string(testRec.key)+"_not_exists", &value)
+		ok, err := module.GetStruct(string(testRec.key)+"_not_exists", &value)
 		suite.False(ok, "Cant find key %s in test onlineconf", string(testRec.key))
+		suite.Nil(err, "Error is not nil")
 	}
 
 	{
