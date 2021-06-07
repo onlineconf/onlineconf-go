@@ -13,6 +13,7 @@ import (
 	"path"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 
 	"github.com/colinmarc/cdb"
@@ -239,6 +240,46 @@ func (m *Module) GetBool(path string, d ...bool) bool {
 	}
 }
 
+// GetStrings reads a []string value of a named parameter from the module.
+// It returns this value if the parameter exists and is a comma-separated
+// string or JSON array.
+// In the other case it returns a default value provided in the second
+// argument.
+func (m *Module) GetStrings(path string, defaultValue []string) []string {
+	var value []string
+	rv := reflect.ValueOf(&value).Elem()
+	if m.getCache(path, rv) {
+		return value
+	}
+
+	format, data := m.get(path)
+	switch format {
+	case 0:
+		return defaultValue
+	case 's':
+		untrimmed := strings.Split(string(data), ",")
+		value = make([]string, 0, len(untrimmed))
+		for _, item := range untrimmed {
+			if trimmed := strings.TrimSpace(item); trimmed != "" {
+				value = append(value, trimmed)
+			}
+		}
+		m.setCache(path, rv)
+		return value
+	case 'j':
+		err := json.Unmarshal(data, &value)
+		if err != nil {
+			log.Printf("%s:%s: failed to unmarshal JSON: %s", m.name, path, err)
+			return defaultValue
+		}
+		m.setCache(path, rv)
+		return value
+	default:
+		log.Printf("%s:%s: unexpected format\n", m.name, path)
+		return defaultValue
+	}
+}
+
 // GetStruct reads a structured value of a named parameter from the module.
 // It stores this value in the value pointed by the value argument
 // and returns true if the parameter exists and was unmarshaled successfully.
@@ -414,6 +455,14 @@ func GetInt(path string, d ...int) int {
 // the second argument.
 func GetBool(path string, d ...bool) bool {
 	return getTree().GetBool(path, d...)
+}
+
+// GetStrings reads a []string value of a named parameter from the module "TREE".
+// It returns this value if the parameter exists and is a comma-separated string
+// or JSON array.
+// In the other case it returns a default value provided in the second argument.
+func GetStrings(path string, defaultValue []string) []string {
+	return getTree().GetStrings(path, defaultValue)
 }
 
 // GetStruct reads a structured value of a named parameter from the module "TREE".
