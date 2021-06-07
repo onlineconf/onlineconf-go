@@ -5,10 +5,13 @@
 package onlineconf
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"path"
+	"reflect"
 	"strconv"
 	"sync"
 
@@ -16,6 +19,8 @@ import (
 	"github.com/fsnotify/fsnotify"
 	"github.com/my-mail-ru/exp/mmap"
 )
+
+var ErrFormatIsNotJSON = errors.New("format is not JSON")
 
 var configDir = "/usr/local/etc/onlineconf"
 
@@ -38,6 +43,8 @@ type Module struct {
 	filename    string
 	mmappedFile *mmap.ReaderAt
 	cdb         *cdb.CDB
+	cache       map[string][]interface{}
+	cacheMutex  sync.RWMutex
 }
 
 func newModule(name string) *Module {
@@ -119,6 +126,10 @@ func (m *Module) reopen() error {
 	if oldMmappedFile != nil {
 		oldMmappedFile.Close()
 	}
+
+	m.cacheMutex.Lock()
+	m.cache = map[string][]interface{}{}
+	m.cacheMutex.Unlock()
 
 	return nil
 }
@@ -228,6 +239,82 @@ func (m *Module) GetBool(path string, d ...bool) bool {
 	}
 }
 
+// GetStruct reads a structured value of a named parameter from the module.
+// It stores this value in the value pointed by the value argument
+// and returns true if the parameter exists and was unmarshaled successfully.
+// In the case of error or if the parameter is not exists, the method doesn't
+// touch the value argument, so you can safely pass a default value as the value
+// argument and completely ignore return values of this method.
+// A value is unmarshaled from JSON using json.Unmarshal and is cached internally
+// until the configuration is updated, so be careful to not modify values returned by
+// a reference.
+// Experimental: this method can be modified or removed without any notice.
+func (m *Module) GetStruct(path string, value interface{}) (bool, error) {
+	rv := reflect.ValueOf(value)
+	if rv.Kind() != reflect.Ptr {
+		if rv.IsValid() {
+			log.Printf("%s: GetStruct(%q, non-pointer %s): invalid argument", m.name, path, rv.Type())
+		} else {
+			log.Printf("%s: GetStruct(%q, nil): invalid argument", m.name, path)
+		}
+		return false, &json.InvalidUnmarshalError{Type: reflect.TypeOf(value)}
+	} else if rv.IsNil() {
+		log.Printf("%s: GetStruct(%q, nil %s): invalid argument", m.name, path, rv.Type())
+		return false, &json.InvalidUnmarshalError{Type: reflect.TypeOf(value)}
+	}
+	rv = rv.Elem()
+
+	if m.getCache(path, rv) {
+		return true, nil
+	}
+
+	format, data := m.get(path)
+	switch format {
+	case 0:
+		return false, nil
+	case 'j':
+		val := reflect.New(rv.Type())
+		err := json.Unmarshal(data, val.Interface())
+		if err != nil {
+			log.Printf("%s:%s: failed to unmarshal JSON: %s", m.name, path, err)
+			return false, err
+		}
+		rv.Set(val.Elem())
+		m.setCache(path, rv)
+		return true, nil
+	default:
+		err := ErrFormatIsNotJSON
+		log.Printf("%s:%s: %s\n", m.name, path, err)
+		return false, err
+	}
+}
+
+func (m *Module) getCache(path string, rv reflect.Value) bool {
+	m.cacheMutex.RLock()
+	defer m.cacheMutex.RUnlock()
+	for _, cv := range m.cache[path] {
+		rcv := reflect.ValueOf(cv)
+		if rcv.Type() == rv.Type() {
+			rv.Set(rcv)
+			return true
+		}
+	}
+	return false
+}
+
+func (m *Module) setCache(path string, rv reflect.Value) {
+	m.cacheMutex.Lock()
+	defer m.cacheMutex.Unlock()
+	values := m.cache[path]
+	for i := range values {
+		if reflect.TypeOf(values[i]) == rv.Type() {
+			values[i] = rv.Interface()
+			return
+		}
+	}
+	m.cache[path] = append(values, rv.Interface())
+}
+
 var modules struct {
 	sync.Mutex
 	byName map[string]*Module
@@ -327,4 +414,18 @@ func GetInt(path string, d ...int) int {
 // the second argument.
 func GetBool(path string, d ...bool) bool {
 	return getTree().GetBool(path, d...)
+}
+
+// GetStruct reads a structured value of a named parameter from the module "TREE".
+// It stores this value in the value pointed by the value argument
+// and returns true if the parameter exists and was unmarshaled successfully.
+// In the case of error or if the parameter is not exists, the function doesn't
+// touch the value argument, so you can safely pass a default value as the value
+// argument and completely ignore return values of this function.
+// A value is unmarshaled from JSON using json.Unmarshal and is cached internally
+// until the configuration is updated, so be careful to not modify values returned by
+// a reference.
+// Experimental: this function can be modified or removed without any notice.
+func GetStruct(path string, value interface{}) (bool, error) {
+	return getTree().GetStruct(path, value)
 }
