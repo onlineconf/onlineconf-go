@@ -7,6 +7,7 @@ import (
 	"os"
 	"reflect"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"unsafe"
@@ -18,11 +19,14 @@ import (
 type testCDBRecord struct {
 	key []byte
 	val []byte
+	exp interface{}
 }
 
 type testRecords struct {
 	stringRecords []testCDBRecord
 	intRecords    []testCDBRecord
+	textStrings   []testCDBRecord
+	jsonStrings   []testCDBRecord
 	structRecords []testCDBRecord
 	partialStruct testCDBRecord
 	invalidStruct testCDBRecord
@@ -60,6 +64,8 @@ func generateTestRecords(count int) testRecords {
 	testRecords := testRecords{
 		stringRecords: make([]testCDBRecord, count),
 		intRecords:    make([]testCDBRecord, count),
+		textStrings:   make([]testCDBRecord, count),
+		jsonStrings:   make([]testCDBRecord, count),
 		structRecords: make([]testCDBRecord, count),
 	}
 
@@ -76,11 +82,24 @@ func generateTestRecords(count int) testRecords {
 
 		// log.Printf("key %s val %s", string(testRecordsInt[i].key), string(testRecordsInt[i].val))
 
+		list := make([]string, 0, 10)
+		for j := 0; j < 10; j++ {
+			list = append(list, "value "+strconv.Itoa(i)+":"+strconv.Itoa(j))
+		}
+		testRecords.textStrings[i].key = []byte("/test/onlineconf/list" + stri)
+		testRecords.textStrings[i].val = []byte("s" + strings.Join(list, ","))
+		testRecords.textStrings[i].exp = list
+
+		value, _ := json.Marshal(list)
+		testRecords.jsonStrings[i].key = []byte("/test/onlineconf/array" + stri)
+		testRecords.jsonStrings[i].val = append([]byte{'j'}, value...)
+		testRecords.jsonStrings[i].exp = list
+
 		data := map[string]string{}
 		for j := 0; j < 10; j++ {
 			data["key"+strconv.Itoa(j)] = "value " + strconv.Itoa(i) + ":" + strconv.Itoa(j)
 		}
-		value, _ := json.Marshal(data)
+		value, _ = json.Marshal(data)
 		testRecords.structRecords[i].key = []byte("/test/onlineconf/struct" + stri)
 		testRecords.structRecords[i].val = append([]byte{'j'}, value...)
 	}
@@ -117,6 +136,8 @@ func fillTestCDB(writer *cdb.Writer, testRecords testRecords) error {
 	allTestRecords := []testCDBRecord{}
 	allTestRecords = append(allTestRecords, testRecords.stringRecords...)
 	allTestRecords = append(allTestRecords, testRecords.intRecords...)
+	allTestRecords = append(allTestRecords, testRecords.textStrings...)
+	allTestRecords = append(allTestRecords, testRecords.jsonStrings...)
 	allTestRecords = append(allTestRecords, testRecords.structRecords...)
 	allTestRecords = append(allTestRecords, testRecords.partialStruct)
 	allTestRecords = append(allTestRecords, testRecords.invalidStruct)
@@ -191,6 +212,29 @@ type testStruct struct {
 	Key0 string
 	Key1 string
 	Key2 string
+}
+
+func (suite *OCTestSuite) TestStings() {
+	module := suite.module
+
+	for i := 0; i < 2; i++ {
+		for _, testRec := range suite.testRecords.textStrings {
+			strs := module.GetStrings(string(testRec.key), nil)
+			suite.Equal(testRec.exp, strs, "unexpected []string value")
+		}
+		for _, testRec := range suite.testRecords.jsonStrings {
+			strs := module.GetStrings(string(testRec.key), nil)
+			suite.Equal(testRec.exp, strs, "unexpected []string value")
+		}
+	}
+
+	defaultValue := []string{"default", "value"}
+
+	strs := module.GetStrings("/not-exists", defaultValue)
+	suite.Equal(defaultValue, strs, "default value must be returned if key is not exists")
+
+	strs = module.GetStrings(string(suite.testRecords.invalidStruct.key), defaultValue)
+	suite.Equal(defaultValue, strs, "default value must be returned if value can't be unmarshaled")
 }
 
 func (suite *OCTestSuite) TestStruct() {
