@@ -8,7 +8,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/onlineconf/onlineconf-go"
+	"github.com/oleynikandrey/onlineconf-go"
 )
 
 func main() {
