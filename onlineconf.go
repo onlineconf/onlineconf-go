@@ -87,7 +87,7 @@ func initWatcher() {
 			case ev := <-watcher.Events:
 				//log.Println("fsnotify event:", ev)
 
-				if ev.Op&fsnotify.Create == fsnotify.Create {
+				if (ev.Op&fsnotify.Create == fsnotify.Create) || (ev.Op&fsnotify.Write == fsnotify.Write) {
 					modules.Lock()
 					module, ok := modules.byFile[ev.Name]
 					modules.Unlock()
