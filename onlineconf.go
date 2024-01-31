@@ -478,3 +478,70 @@ func GetStrings(path string, defaultValue []string) []string {
 func GetStruct(path string, value interface{}) (bool, error) {
 	return getTree().GetStruct(path, value)
 }
+
+// GetStructFull returns a root tree based on keys
+func (m *Module) GetStructFull() (map[string]interface{}, error) {
+	iter := m.cdb.Iter()
+
+	result := map[string]interface{}{}
+	for iter.Next() {
+		keyStr := string(iter.Key())
+		if keyStr == "" {
+			continue
+		}
+		provValueStr := string(iter.Value())
+		propValue := provValueStr[1:]
+		propFormat := provValueStr[0]
+		keys := strings.Split(keyStr, ".")
+		currentNode := result
+		for i := 0; i < len(keys); i++ {
+			key := keys[i]
+			iterNode, ok := currentNode[key]
+			if ok {
+				currentNode = iterNode.(map[string]interface{})
+				continue
+			}
+
+			if i+1 != len(keys) {
+				// not the last node in the path
+				currentNode[keys[i]] = map[string]interface{}{}
+				currentNode = currentNode[keys[i]].(map[string]interface{})
+				continue
+			}
+
+			// process last values
+			switch propFormat {
+			case 0:
+				return nil, nil
+			case 'j':
+				var jsonValue interface{}
+				if err := json.Unmarshal([]byte(propValue), &jsonValue); err != nil {
+					return nil, fmt.Errorf("can't unmarshal yaml struct in the config...%s", err.Error())
+				}
+				currentNode[key] = jsonValue
+			case 's':
+				untrimmed := strings.Split(propValue, ",")
+				if len(untrimmed) == 1 {
+					currentNode[key] = propValue
+				} else {
+					value := make([]string, 0, len(untrimmed))
+					for _, item := range untrimmed {
+						if trimmed := strings.TrimSpace(item); trimmed != "" {
+							value = append(value, trimmed)
+						}
+					}
+					currentNode[key] = value
+				}
+			default:
+				currentNode[key] = propValue
+			}
+
+		}
+	}
+
+	if err := iter.Err(); err != nil {
+		log.Fatal(err)
+	}
+
+	return result, nil
+}

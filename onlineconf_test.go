@@ -305,6 +305,23 @@ func (suite *OCTestSuite) TestReload() {
 	// todo
 }
 
+func (suite *OCTestSuite) TestStructFull() {
+
+	module := suite.module
+
+	fullStruct, err := module.GetStructFull()
+	suite.Nil(err, "Error is not nil")
+	for _, testRec := range suite.testRecords.textStrings {
+		suite.Equal(testRec.exp, fullStruct[string(testRec.key)], "unexpected []string value")
+	}
+	for _, testRec := range suite.testRecords.stringRecords {
+		suite.Equal(string(testRec.val[1:]), fullStruct[string(testRec.key)], "unexpected string value")
+	}
+	for _, testRec := range suite.testRecords.intRecords {
+		suite.Equal(string(testRec.val[1:]), fullStruct[string(testRec.key)], "unexpected int value")
+	}
+}
+
 func (suite *OCTestSuite) TestConcurrent() {
 
 	module := suite.module
