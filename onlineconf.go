@@ -496,6 +496,9 @@ func (m *Module) GetStructFull() (map[string]interface{}, error) {
 		currentNode := result
 		for i := 0; i < len(keys); i++ {
 			key := keys[i]
+			if key == "" {
+				continue
+			}
 			iterNode, ok := currentNode[key]
 			if ok {
 				currentNode = iterNode.(map[string]interface{})
