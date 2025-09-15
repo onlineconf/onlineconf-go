@@ -26,7 +26,6 @@ func (cache *valueCache) get(path string, val reflect.Value) bool {
 	for _, cached := range cache.cache[path] {
 		if cached.Type() == typ {
 			val.Set(cached)
-
 			return true
 		}
 	}
@@ -43,7 +42,7 @@ func (cache *valueCache) set(path string, val reflect.Value) {
 
 	for i, cached := range values {
 		if cached.Type() == typ {
-			values[i].Set(val)
+			values[i] = reflect.ValueOf(val.Interface())
 			return
 		}
 	}

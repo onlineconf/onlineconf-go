@@ -2,10 +2,13 @@ package onlineconf
 
 import (
 	"reflect"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
+
+const testGoroCount = 10
 
 type testCacheStruct struct {
 	a int
@@ -45,7 +48,19 @@ func TestValueCache(t *testing.T) {
 	cache.init()
 
 	for _, tt := range tests {
-		cache.set(tt.path, reflect.ValueOf(tt.value))
+		wg := sync.WaitGroup{}
+
+		// emulate cache stampede with concurrent requests
+		for range testGoroCount {
+			wg.Add(1)
+
+			go func() {
+				cache.set(tt.path, reflect.ValueOf(tt.value))
+				wg.Done()
+			}()
+		}
+
+		wg.Wait()
 	}
 
 	for _, tt := range tests {
