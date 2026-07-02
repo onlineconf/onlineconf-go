@@ -57,22 +57,29 @@ type syncCache[T any] struct {
 }
 
 func (sc *syncCache[T]) load(key any) (T, chan<- struct{}, bool) {
-	ch := make(chan struct{})
+	for {
+		ch := make(chan struct{})
 
-	value, loaded := sc.m.LoadOrStore(key, ch)
-	if !loaded { // no value and no pending operation
-		var zero T
-		return zero, ch, false
+		value, loaded := sc.m.LoadOrStore(key, ch)
+		if !loaded { // Cache was empty, new channel stored.
+			var zero T
+			return zero, ch, false
+		}
+
+		if cached, ok := value.(T); ok {
+			return cached, nil, true // Got cached value.
+		}
+
+		<-value.(chan struct{}) // Got pending operation, wait for it to finish.
+
+		if v, ok := sc.m.Load(key); ok {
+			if cached, ok := v.(T); ok { // Pending operation cached a value.
+				return cached, nil, true
+			}
+			// A newer pending operation is in process; wait again.
+		}
+		// Pending operation aborted (key deleted); retry whole process.
 	}
-
-	if cached, ok := value.(T); ok {
-		return cached, nil, true
-	}
-
-	<-value.(chan struct{})
-	value, _ = sc.m.Load(key)
-
-	return value.(T), nil, true
 }
 
 func (sc *syncCache[T]) loadOnly(key any) (T, bool) {
@@ -87,12 +94,24 @@ func (sc *syncCache[T]) loadOnly(key any) (T, bool) {
 	}
 
 	<-value.(chan struct{})
-	value, _ = sc.m.Load(key)
 
-	return value.(T), true
+	if v, ok := sc.m.Load(key); ok {
+		if cached, ok := v.(T); ok {
+			return cached, true
+		}
+	}
+
+	var zero T
+	return zero, false
 }
 
 func (sc *syncCache[T]) store(key any, ch chan<- struct{}, value T) {
 	sc.m.Store(key, value)
+	close(ch)
+}
+
+// abort releases a pending slot acquired by load without storing a value.
+func (sc *syncCache[T]) abort(key any, ch chan<- struct{}) {
+	sc.m.Delete(key)
 	close(ch)
 }
