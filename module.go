@@ -65,6 +65,13 @@ func OpenModule(name string) (*Module, error) {
 		return cached, nil
 	}
 
+	stored := false
+	defer func() {
+		if !stored {
+			modCache.abort(name, inProgressByName) // release the pending slot so a retry doesn't deadlock
+		}
+	}()
+
 	filename, err := modFileName(name)
 	if err != nil {
 		return nil, err
@@ -76,8 +83,15 @@ func OpenModule(name string) (*Module, error) {
 		cached, inProgressByFileName, ok = modCache.load(filename)
 		if ok {
 			modCache.store(name, inProgressByName, cached) // re-cache by relative/short name if already cached by fully qualified name
+			stored = true
 			return cached, nil
 		}
+
+		defer func() {
+			if !stored {
+				modCache.abort(filename, inProgressByFileName)
+			}
+		}()
 	}
 
 	module := &Module{
@@ -94,6 +108,8 @@ func OpenModule(name string) (*Module, error) {
 	if filename != name {
 		modCache.store(filename, inProgressByFileName, module)
 	}
+
+	stored = true
 
 	return module, initWatcher(filepath.Dir(filename))
 }
