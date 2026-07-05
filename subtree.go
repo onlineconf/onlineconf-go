@@ -71,9 +71,18 @@ func (s *Subtree) GetDurationErr(path string) (time.Duration, error) {
 	return s.mod.GetDurationErr(s.prefix + path)
 }
 
-// GetDurationIsExists calls [Module.GetDurationIsExists] using the subtree prefix.
+// GetDurationIfExists calls [Module.GetDurationIfExists] using the subtree prefix.
+func (s *Subtree) GetDurationIfExists(path string) (time.Duration, bool) {
+	return s.mod.GetDurationIfExists(s.prefix + path)
+}
+
+// GetDurationIsExists is a deprecated alias for [Subtree.GetDurationIfExists].
+//
+// Deprecated: The name contains a typo ("Is" instead of "If"). Use
+// [Subtree.GetDurationIfExists] instead. This method is kept for backward
+// compatibility and will be removed in a future release.
 func (s *Subtree) GetDurationIsExists(path string) (time.Duration, bool) {
-	return s.mod.GetDurationIsExists(s.prefix + path)
+	return s.GetDurationIfExists(path)
 }
 
 // GetDuration calls [Module.GetDuration] using the subtree prefix.
