@@ -516,7 +516,8 @@ type onlineconfIface interface {
 	GetBoolIfExists(path string) (bool, bool)
 	GetBool(path string, dfl bool) bool
 	GetDurationErr(path string) (time.Duration, error)
-	GetDurationIsExists(path string) (time.Duration, bool)
+	GetDurationIfExists(path string) (time.Duration, bool)
+	GetDurationIsExists(path string) (time.Duration, bool) // deprecated
 	GetDuration(path string, dfl time.Duration) time.Duration
 	GetFloatErr(path string) (float64, error)
 	GetFloatIfExists(path string) (float64, bool)

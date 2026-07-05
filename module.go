@@ -381,11 +381,11 @@ func parseDuration(s string) (time.Duration, error) {
 	return time.ParseDuration(s + "s")
 }
 
-// GetDurationIsExists reads a [time.Duration] value of a named parameter from the module.
+// GetDurationIfExists reads a [time.Duration] value of a named parameter from the module.
 //
 // Calls [Module.GetDurationErr] internally. In the case of an error (0, false) is returned.
 // Errors other than [ErrNotFound] are logged.
-func (m *Module) GetDurationIsExists(path string) (time.Duration, bool) {
+func (m *Module) GetDurationIfExists(path string) (time.Duration, bool) {
 	d, err := m.GetDurationErr(path)
 	if err != nil {
 		if err != ErrNotFound {
@@ -398,11 +398,20 @@ func (m *Module) GetDurationIsExists(path string) (time.Duration, bool) {
 	return d, true
 }
 
+// GetDurationIsExists is a deprecated alias for [Module.GetDurationIfExists].
+//
+// Deprecated: The name contains a typo ("Is" instead of "If"). Use
+// [Module.GetDurationIfExists] instead. This method is kept for backward
+// compatibility and will be removed in a future release.
+func (m *Module) GetDurationIsExists(path string) (time.Duration, bool) {
+	return m.GetDurationIfExists(path)
+}
+
 // GetDuration reads a [time.Duration] value of a named parameter from the module.
-// Calls [Module.GetDurationIsExists] internally. The default value `dfl` is returned when
-// [Module.GetDurationIsExists] returns (0, false).
+// Calls [Module.GetDurationIfExists] internally. The default value `dfl` is returned when
+// [Module.GetDurationIfExists] returns (0, false).
 func (m *Module) GetDuration(path string, dfl time.Duration) time.Duration {
-	if val, ok := m.GetDurationIsExists(path); ok {
+	if val, ok := m.GetDurationIfExists(path); ok {
 		return val
 	}
 
